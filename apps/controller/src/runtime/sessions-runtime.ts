@@ -110,6 +110,46 @@ function sessionMetadataPath(filePath: string): string {
   return filePath.replace(/\.jsonl$/, ".meta.json");
 }
 
+function encodeSessionId(botId: string, sessionKey: string): string {
+  return `session:${Buffer.from(
+    JSON.stringify({ botId, sessionKey }),
+    "utf8",
+  ).toString("base64url")}`;
+}
+
+function decodeSessionId(
+  id: string,
+): { botId: string; sessionKey: string } | null {
+  if (!id.startsWith("session:")) {
+    return null;
+  }
+
+  try {
+    const raw = Buffer.from(id.slice("session:".length), "base64url").toString(
+      "utf8",
+    );
+    const parsed = JSON.parse(raw) as {
+      botId?: unknown;
+      sessionKey?: unknown;
+    };
+    if (
+      typeof parsed.botId !== "string" ||
+      parsed.botId.length === 0 ||
+      typeof parsed.sessionKey !== "string" ||
+      parsed.sessionKey.length === 0
+    ) {
+      return null;
+    }
+
+    return {
+      botId: parsed.botId,
+      sessionKey: parsed.sessionKey,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function abbreviateOpaqueId(value: string): string {
   return value.slice(0, 8).toUpperCase();
 }
@@ -309,7 +349,7 @@ export class SessionsRuntime {
           const lastMsg = messages.at(-1);
 
           sessions.push({
-            id: file.name,
+            id: encodeSessionId(agentEntry.name, sessionKey),
             botId: agentEntry.name,
             sessionKey,
             channelType: channelType ?? null,
@@ -904,7 +944,18 @@ export class SessionsRuntime {
   }
 
   async getSession(id: string): Promise<SessionResponse | null> {
+    const decoded = decodeSessionId(id);
+    if (decoded) {
+      return this.getSessionByKey(decoded.botId, decoded.sessionKey);
+    }
+
     const sessions = await this.listSessions();
+    const legacyMatches = sessions.filter(
+      (session) => `${session.sessionKey}.jsonl` === id,
+    );
+    if (legacyMatches.length === 1) {
+      return legacyMatches[0] ?? null;
+    }
     return sessions.find((session) => session.id === id) ?? null;
   }
 
@@ -912,11 +963,11 @@ export class SessionsRuntime {
     botId: string,
     sessionKey: string,
   ): Promise<SessionResponse | null> {
-    const id = `${sessionKey}.jsonl`;
     const sessions = await this.listSessions();
     return (
       sessions.find(
-        (session) => session.id === id && session.botId === botId,
+        (session) =>
+          session.botId === botId && session.sessionKey === sessionKey,
       ) ?? null
     );
   }

@@ -51,6 +51,102 @@ describe("SessionsRuntime", () => {
     }
   });
 
+  it("returns unique ids and correct history for duplicate session filenames across bots", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const webSessionsDir = path.join(rootDir, "agents", "bot-web", "sessions");
+    const wechatSessionsDir = path.join(
+      rootDir,
+      "agents",
+      "bot-wechat",
+      "sessions",
+    );
+    await mkdir(webSessionsDir, { recursive: true });
+    await mkdir(wechatSessionsDir, { recursive: true });
+
+    await writeFile(
+      path.join(webSessionsDir, "shared.jsonl"),
+      `${JSON.stringify({
+        type: "message",
+        id: "web-msg-1",
+        timestamp: "2026-04-10T10:00:00.000Z",
+        message: {
+          role: "user",
+          timestamp: Date.parse("2026-04-10T10:00:00.000Z"),
+          content: "web only",
+        },
+      })}
+`,
+      "utf8",
+    );
+    await writeFile(
+      path.join(webSessionsDir, "shared.meta.json"),
+      JSON.stringify({
+        title: "Web thread",
+        channelType: "web",
+      }),
+      "utf8",
+    );
+
+    await writeFile(
+      path.join(wechatSessionsDir, "shared.jsonl"),
+      `${JSON.stringify({
+        type: "message",
+        id: "wechat-msg-1",
+        timestamp: "2026-04-10T10:01:00.000Z",
+        message: {
+          role: "user",
+          timestamp: Date.parse("2026-04-10T10:01:00.000Z"),
+          content: "wechat only",
+        },
+      })}
+`,
+      "utf8",
+    );
+    await writeFile(
+      path.join(wechatSessionsDir, "shared.meta.json"),
+      JSON.stringify({
+        title: "WeChat thread",
+        channelType: "openclaw-weixin",
+      }),
+      "utf8",
+    );
+
+    const sessions = await runtime.listSessions();
+    const webSession = sessions.find((session) => session.botId === "bot-web");
+    const wechatSession = sessions.find(
+      (session) => session.botId === "bot-wechat",
+    );
+
+    expect(webSession).toBeDefined();
+    expect(wechatSession).toBeDefined();
+
+    if (!webSession || !wechatSession) {
+      throw new Error("expected both repro sessions to exist");
+    }
+
+    expect(webSession.id).not.toBe(wechatSession.id);
+
+    const wechatHistory = await runtime.getChatHistory(wechatSession.id);
+    const webHistory = await runtime.getChatHistory(webSession.id);
+
+    expect(wechatHistory.messages).toHaveLength(1);
+    expect(wechatHistory.messages[0]?.content).toBe("wechat only");
+    expect(webHistory.messages).toHaveLength(1);
+    expect(webHistory.messages[0]?.content).toBe("web only");
+  });
+
   it("merges filesystem metadata into session responses", async () => {
     rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
     const runtime = new SessionsRuntime(
