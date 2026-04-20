@@ -1227,6 +1227,10 @@ const zhCN = {
   "localChat.creatingDefaultBot": "正在创建机器人…",
   "localChat.createDefaultBotError": "创建机器人失败",
   "localChat.retryCreateBot": "重试",
+  "localChat.missingApiKey.title": "未配置 API Key",
+  "localChat.missingApiKey.description":
+    "请先配置 LLM API Key，才能使用聊天功能。",
+  "localChat.missingApiKey.goToSettings": "前往设置",
 } as const;
 
 export default zhCN;

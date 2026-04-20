@@ -1298,6 +1298,10 @@ const en = {
   "localChat.creatingDefaultBot": "Creating your bot…",
   "localChat.createDefaultBotError": "Failed to create bot",
   "localChat.retryCreateBot": "Retry",
+  "localChat.missingApiKey.title": "No API Key configured",
+  "localChat.missingApiKey.description":
+    "Please configure your LLM API key to use the chat.",
+  "localChat.missingApiKey.goToSettings": "Go to Settings",
 } as const;
 
 export default en;

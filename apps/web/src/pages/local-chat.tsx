@@ -105,6 +105,19 @@ const SESSION_DISCOVERY_INTERVAL_MS = 500;
 /** Maximum number of session-discovery attempts after send */
 const SESSION_DISCOVERY_MAX_ATTEMPTS = 6;
 
+/** Patterns that identify the "missing API key" error from OpenClaw */
+const MISSING_API_KEY_PATTERNS = [
+  "⚠️ Agent failed before reply: No API key found for provider",
+  "No API key found for provider",
+  "missing_api_key",
+];
+
+function isMissingApiKeyError(text: string): boolean {
+  return MISSING_API_KEY_PATTERNS.some((p) =>
+    text.toLowerCase().includes(p.toLowerCase()),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -630,8 +643,90 @@ function TypingIndicator() {
   );
 }
 
+/** Renders a friendly "No API Key" warning card instead of a raw error */
+function ApiKeyWarningCard({
+  t,
+}: { t: ReturnType<typeof useTranslation>["t"] }) {
+  return (
+    <div className="flex items-start gap-3">
+      <img
+        src={BOT_AVATAR}
+        alt=""
+        className="h-9 w-9 shrink-0 object-contain -ml-1"
+      />
+      <div className="flex max-w-[44rem] flex-col gap-2">
+        <div
+          style={{
+            background: "#FFF7E6",
+            border: "1px solid #FFD591",
+            borderRadius: 12,
+            padding: "14px 16px",
+          }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <svg
+              style={{ color: "#FA8C16", width: 18, height: 18, flexShrink: 0 }}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+            </svg>
+            <span
+              style={{
+                fontWeight: 600,
+                fontSize: 13,
+                color: "#431907",
+              }}
+            >
+              {t("localChat.missingApiKey.title")}
+            </span>
+          </div>
+          <p
+            style={{
+              color: "#7A4A0E",
+              fontSize: 13,
+              margin: "0 0 10px 26px",
+              lineHeight: 1.5,
+            }}
+          >
+            {t("localChat.missingApiKey.description")}
+          </p>
+          <a
+            href="/workspace/settings?tab=providers"
+            style={{
+              display: "inline-block",
+              marginLeft: 26,
+              background: "#FA8C16",
+              border: "none",
+              borderRadius: 6,
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 500,
+              padding: "4px 12px",
+              textDecoration: "none",
+              cursor: "pointer",
+            }}
+          >
+            {t("localChat.missingApiKey.goToSettings")}
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Renders a single chat message — supports text, images, and file cards */
-function ChatBubble({ msg }: { msg: ChatMsg }) {
+function ChatBubble({
+  msg,
+  t,
+}: { msg: ChatMsg; t: ReturnType<typeof useTranslation>["t"] }) {
   const isBot = msg.role === "assistant";
   const time = formatTs(msg.timestamp);
 
@@ -644,6 +739,14 @@ function ChatBubble({ msg }: { msg: ChatMsg }) {
     (b) => b.kind !== "text" || b.text.trim().length > 0,
   );
   if (!hasContent) return null;
+
+  // Detect and render the missing-API-key error as a friendly warning card
+  const firstTextBlock = blocks.find((b) => b.kind === "text");
+  const rawText =
+    typeof firstTextBlock?.text === "string" ? firstTextBlock.text : "";
+  if (isMissingApiKeyError(rawText)) {
+    return <ApiKeyWarningCard t={t} />;
+  }
 
   return (
     <div
@@ -1471,7 +1574,7 @@ export function LocalChatPage() {
             <div className="mx-auto flex w-full max-w-[920px] flex-col gap-5">
               {/* biome-ignore lint/style/noNonNullAssertion: messages is guaranteed non-null in this branch */}
               {messages!.map((msg) => (
-                <ChatBubble key={msg.id} msg={msg} />
+                <ChatBubble key={msg.id} msg={msg} t={t} />
               ))}
               {waitingReply && <TypingIndicator />}
               <div ref={endRef} />
