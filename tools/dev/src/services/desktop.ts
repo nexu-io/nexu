@@ -150,6 +150,10 @@ function createDesktopLaunchEnv(): DesktopLaunchEnv {
       NEXU_DESKTOP_BUILD_TIME:
         process.env.NEXU_DESKTOP_BUILD_TIME ?? new Date().toISOString(),
       NEXU_DESKTOP_LAUNCH_ID: launchId,
+      // Tell the desktop runtime to attach to externally-managed services
+      // (controller, web, openclaw) started by pnpm dev, instead of starting
+      // its own instances on the same ports.
+      NEXU_DESKTOP_EXTERNAL_RUNTIME: "1",
     },
   };
 }

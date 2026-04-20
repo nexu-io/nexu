@@ -122,6 +122,7 @@ const zhCN = {
   "layout.nav.deployments": "部署",
   "layout.nav.skills": "技能",
   "layout.nav.settings": "设置",
+  "layout.nav.localChat": "对话",
   "layout.conversations": "对话",
   "layout.signOut": "退出登录",
   "layout.help.title": "帮助",
@@ -1205,6 +1206,31 @@ const zhCN = {
   "common.loading": "加载中...",
   "common.connect": "连接",
   "common.disconnect": "断开连接",
+
+  // ── Local Chat ──
+  "localChat.title": "本地对话",
+  "localChat.subtitle": "直接与你的 AI 机器人对话",
+  "localChat.selectBot": "选择机器人",
+  "localChat.noBots": "暂无可用机器人",
+  "localChat.selectBotFirst": "请先在上方选择机器人",
+  "localChat.waiting": "等待回复中…",
+  "localChat.inputPlaceholder": "输入消息… （Enter 发送，Shift+Enter 换行）",
+  "localChat.attachFile": "附加图片或文件",
+  "localChat.removeAttachment": "移除",
+  "localChat.startChat": "与 {{name}} 对话",
+  "localChat.pickBot": "选择一个机器人开始",
+  "localChat.emptyHint": "选择机器人后，在下方输入消息",
+  "localChat.selectChannel": "频道",
+  "localChat.channel.webchat": "WebChat",
+  "localChat.channel.feishu": "飞书",
+  "localChat.channel.wechat": "微信",
+  "localChat.creatingDefaultBot": "正在创建机器人…",
+  "localChat.createDefaultBotError": "创建机器人失败",
+  "localChat.retryCreateBot": "重试",
+  "localChat.missingApiKey.title": "未配置 API Key",
+  "localChat.missingApiKey.description":
+    "请先配置 LLM API Key，才能使用聊天功能。",
+  "localChat.missingApiKey.goToSettings": "前往设置",
 } as const;
 
 export default zhCN;

@@ -186,6 +186,90 @@
         }
       }
     },
+    "/api/v1/bots/default": {
+      "get": {
+        "tags": [
+          "Bots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default bot (existing or newly created)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "poolId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "paused",
+                        "deleted"
+                      ]
+                    },
+                    "modelId": {
+                      "type": "string"
+                    },
+                    "systemPrompt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "poolId",
+                    "status",
+                    "modelId",
+                    "systemPrompt",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to get or create default bot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/bots/{botId}": {
       "get": {
         "tags": [
@@ -6498,6 +6582,419 @@
                   },
                   "required": [
                     "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/session": {
+      "get": {
+        "tags": [
+          "Chat"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "botId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "sessionKey",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session resolved from sessionKey",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "botId": {
+                          "type": "string"
+                        },
+                        "sessionKey": {
+                          "type": "string"
+                        },
+                        "channelType": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "channelId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "messageCount": {
+                          "type": "number"
+                        },
+                        "lastMessageAt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "nullable": true,
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "botId",
+                        "sessionKey",
+                        "channelType",
+                        "channelId",
+                        "title",
+                        "status",
+                        "messageCount",
+                        "lastMessageAt",
+                        "metadata",
+                        "createdAt",
+                        "updatedAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "session"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/local": {
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "botId": {
+                    "type": "string"
+                  },
+                  "sessionKey": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "text",
+                          "image",
+                          "video",
+                          "audio",
+                          "file"
+                        ]
+                      },
+                      "content": {
+                        "type": "string",
+                        "maxLength": 10000000
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "properties": {
+                          "width": {
+                            "type": "number"
+                          },
+                          "height": {
+                            "type": "number"
+                          },
+                          "duration": {
+                            "type": "number"
+                          },
+                          "mimeType": {
+                            "type": "string"
+                          },
+                          "filename": {
+                            "type": "string"
+                          },
+                          "size": {
+                            "type": "number"
+                          }
+                        }
+                      },
+                      "attachments": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "image",
+                                "file"
+                              ]
+                            },
+                            "content": {
+                              "type": "string",
+                              "maxLength": 10000000
+                            },
+                            "metadata": {
+                              "type": "object",
+                              "properties": {
+                                "mimeType": {
+                                  "type": "string"
+                                },
+                                "filename": {
+                                  "type": "string"
+                                },
+                                "size": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "content"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "content"
+                    ]
+                  }
+                },
+                "required": [
+                  "botId",
+                  "sessionKey",
+                  "message"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Local chat message sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "botId": {
+                          "type": "string"
+                        },
+                        "sessionKey": {
+                          "type": "string"
+                        },
+                        "channelType": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "channelId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "messageCount": {
+                          "type": "number"
+                        },
+                        "lastMessageAt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "nullable": true,
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "botId",
+                        "sessionKey",
+                        "channelType",
+                        "channelId",
+                        "title",
+                        "status",
+                        "messageCount",
+                        "lastMessageAt",
+                        "metadata",
+                        "createdAt",
+                        "updatedAt"
+                      ]
+                    },
+                    "message": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "content": {
+                          "nullable": true
+                        },
+                        "timestamp": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "role",
+                        "type",
+                        "timestamp",
+                        "createdAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "session",
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/history": {
+      "get": {
+        "tags": [
+          "Chat"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "botId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2000
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Full conversation history aggregated across all compacted sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "assistant"
+                            ]
+                          },
+                          "content": {
+                            "nullable": true
+                          },
+                          "timestamp": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "role",
+                          "timestamp",
+                          "createdAt"
+                        ]
+                      }
+                    },
+                    "sessionCount": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "messages",
+                    "sessionCount"
                   ]
                 }
               }

@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { registerArtifactRoutes } from "../routes/artifact-routes.js";
 import { registerBotRoutes } from "../routes/bot-routes.js";
 import { registerChannelRoutes } from "../routes/channel-routes.js";
+import { registerChatRoutes } from "../routes/chat-routes.js";
 import { registerDesktopCompatRoutes } from "../routes/desktop-compat-routes.js";
 import { registerDesktopRewardsRoutes } from "../routes/desktop-rewards-routes.js";
 import { registerDesktopRoutes } from "../routes/desktop-routes.js";
@@ -40,6 +41,7 @@ export function createApp(container: ControllerContainer) {
   registerDesktopCompatRoutes(app, container);
   registerDesktopRewardsRoutes(app, container);
   registerChannelRoutes(app, container);
+  registerChatRoutes(app, container);
   registerSessionRoutes(app, container);
   registerModelRoutes(app, container);
   registerProviderOAuthRoutes(app, container);

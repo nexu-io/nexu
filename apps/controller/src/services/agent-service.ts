@@ -1,4 +1,4 @@
-import type { CreateBotInput, UpdateBotInput } from "@nexu/shared";
+import type { BotResponse, CreateBotInput, UpdateBotInput } from "@nexu/shared";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 import type { OpenClawSyncService } from "./openclaw-sync-service.js";
 
@@ -52,6 +52,26 @@ export class AgentService {
     if (bot !== null) {
       await this.syncService.syncAll();
     }
+    return bot;
+  }
+
+  async getOrCreateDefaultBot(): Promise<BotResponse> {
+    const existing = await this.configStore.listBots();
+    const activeBots = existing.filter((b) => b.status === "active");
+
+    if (activeBots.length > 0) {
+      // biome-ignore lint/style/noNonNullAssertion: activeBots.length > 0 guarantees [0] exists
+      return activeBots[0]!;
+    }
+
+    const config = await this.configStore.getConfig();
+    const bot = await this.configStore.createBot({
+      name: "Local Chat",
+      slug: "nexu-local-chat",
+      modelId: config.runtime.defaultModelId,
+    });
+    await this.syncService.writePlatformTemplatesForBot(bot.id);
+    await this.syncService.syncAll();
     return bot;
   }
 }

@@ -625,7 +625,11 @@ export class OpenClawWsClient {
     const id = randomUUID();
     const signedAtMs = Date.now();
     const role = "operator";
-    const scopes = ["operator.admin"];
+    // operator.admin covers admin-level access; operator.read and operator.write
+    // must be explicitly included so write-scoped operations (Feishu/WeChat
+    // announce, sub-agent follow-up calls) do not hit "missing scope" rejections
+    // on the loopback gateway.  See OpenClaw CHANGELOG: #22582.
+    const scopes = ["operator.admin", "operator.read", "operator.write"];
     const clientId = "gateway-client";
     const clientMode = "backend";
     const platform = process.platform;

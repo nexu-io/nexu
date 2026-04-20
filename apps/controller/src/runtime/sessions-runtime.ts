@@ -20,7 +20,14 @@ import type {
   UpdateSessionInput,
 } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
+import { logger } from "../lib/logger.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
+
+/**
+ * Agent names that are built into OpenClaw and must not appear as Nexu bots.
+ * The "main" agent is the OpenClaw default; add others here if they emerge.
+ */
+const OPENCLAW_RESERVED_AGENT_NAMES = new Set(["main"]);
 
 export type ChatMessage = {
   id: string;
@@ -106,6 +113,20 @@ const FEISHU_MENTION_TAGS_SYSTEM_LINE =
 const FEISHU_SELF_MENTION_SYSTEM_LINE =
   /\n*\[System: If user_id is "[^"]+", that mention refers to you\.\]\s*$/u;
 
+/**
+ * Text patterns identifying user-role messages synthesized by the OpenClaw
+ * runtime itself rather than sent by a real user.  They are in-context
+ * control prompts aimed at the model (e.g. triggering a memory-flush write
+ * pass before compaction) and should not appear in the visible transcript.
+ *
+ * Add new patterns conservatively — the stricter the match, the lower the
+ * risk of hiding a genuine user message that happens to paraphrase one of
+ * these prompts.
+ */
+const SynthesizedUserMessagePatterns: readonly RegExp[] = [
+  /^Pre-compaction memory flush\. Store durable memories now/u,
+];
+
 function sessionMetadataPath(filePath: string): string {
   return filePath.replace(/\.jsonl$/, ".meta.json");
 }
@@ -186,8 +207,59 @@ export class SessionsRuntime {
           continue;
         }
 
+        // Skip OpenClaw built-in agents — they are not Nexu bots and their
+        // sessions (e.g. from openclaw-control-ui) must not appear in the
+        // Nexu session list.
+        if (OPENCLAW_RESERVED_AGENT_NAMES.has(agentEntry.name)) {
+          continue;
+        }
+
         const sessionsDir = path.join(agentsDir, agentEntry.name, "sessions");
         const sessionsIndex = await this.readSessionsIndex(sessionsDir);
+
+        // Build the set of JSONL filenames that are currently referenced by
+        // sessions.json.  Any JSONL file NOT in this set is an "orphaned"
+        // compacted session (a previous main session that was superseded by
+        // context compaction) — we exclude it from the list so the UI only
+        // shows the current active session for each conversation thread.
+        //
+        // Also collect filenames that belong to sub-agent sessions (sessionKey
+        // contains ":subagent:").  Sub-agent sessions are spawned internally
+        // by the main agent to offload work (e.g. a WeChat bot delegating to
+        // a task sub-agent); they are not user-initiated conversations and
+        // should not appear in the conversation list.
+        const activeFileNames = new Set<string>();
+        const subagentFileNames = new Set<string>();
+        const heartbeatFileNames = new Set<string>();
+        for (const [indexKey, entry] of Object.entries(sessionsIndex)) {
+          let fileName: string | null = null;
+          if (
+            typeof entry.sessionFile === "string" &&
+            entry.sessionFile.trim()
+          ) {
+            fileName = path.basename(entry.sessionFile);
+          } else if (
+            typeof entry.sessionId === "string" &&
+            entry.sessionId.trim()
+          ) {
+            fileName = `${entry.sessionId}.jsonl`;
+          }
+          if (!fileName) {
+            continue;
+          }
+          activeFileNames.add(fileName);
+          if (indexKey.includes(":subagent:")) {
+            subagentFileNames.add(fileName);
+          }
+          // Skip heartbeat sessions — OpenClaw sends a "heartbeat" message
+          // to bootstrap a brand-new agent workspace; this is an internal
+          // mechanism, not a user conversation, and must not appear in the
+          // sidebar session list.
+          if (entry.origin?.provider === "heartbeat") {
+            heartbeatFileNames.add(fileName);
+          }
+        }
+
         let files: Dirent[];
         try {
           files = await readdir(sessionsDir, { withFileTypes: true });
@@ -197,6 +269,25 @@ export class SessionsRuntime {
 
         for (const file of files) {
           if (!file.isFile() || !file.name.endsWith(".jsonl")) {
+            continue;
+          }
+
+          // Skip orphaned compacted sessions — they are not in sessions.json
+          // and their history is merged transparently by getFullMainChatHistory.
+          if (activeFileNames.size > 0 && !activeFileNames.has(file.name)) {
+            continue;
+          }
+
+          // Skip sub-agent sessions — they are internal delegations (main
+          // agent spawning a task sub-agent to offload work), not
+          // user-initiated conversations.  They must not appear in the
+          // sidebar conversation list.
+          if (subagentFileNames.has(file.name)) {
+            continue;
+          }
+          // Skip heartbeat sessions — OpenClaw's internal workspace bootstrap
+          // mechanism, not a real user conversation.
+          if (heartbeatFileNames.has(file.name)) {
             continue;
           }
 
@@ -431,7 +522,10 @@ export class SessionsRuntime {
     if (!session) {
       return { messages: [], sessionKey: null };
     }
-    const filePath = this.getSessionFilePath(session.botId, session.sessionKey);
+    const filePath = await this.resolveSessionFilePath(
+      session.botId,
+      session.sessionKey,
+    );
     return {
       messages: await this.readMessages(
         filePath,
@@ -451,7 +545,10 @@ export class SessionsRuntime {
     if (!session) {
       return { messages: [], sessionKey: null };
     }
-    const filePath = this.getSessionFilePath(session.botId, session.sessionKey);
+    const filePath = await this.resolveSessionFilePath(
+      session.botId,
+      session.sessionKey,
+    );
     return {
       messages: await this.readMessages(
         filePath,
@@ -460,6 +557,116 @@ export class SessionsRuntime {
       ),
       sessionKey: session.sessionKey,
     };
+  }
+
+  /**
+   * Returns the full conversation history for a bot's main webchat session,
+   * aggregating across all compacted sessions in chronological order.
+   *
+   * When OpenClaw performs context compaction it creates a new UUID-named JSONL
+   * and updates sessions.json to point agent:{botId}:main at that new file.
+   * The previous session files remain on disk but are no longer referenced by
+   * any session key ("orphaned").  Since every channel session (WeChat, Feishu,
+   * Slack, …) is always mapped in sessions.json, any orphaned JSONL file must
+   * have been a previous main (webchat) session — so we include all of them.
+   *
+   * The result is sorted by message createdAt so the timeline reads correctly
+   * across session boundaries.
+   */
+  async getFullMainChatHistory(
+    botId: string,
+    limit = 500,
+  ): Promise<{ messages: ChatMessage[]; sessionCount: number }> {
+    const sessionsDir = path.join(
+      this.env.openclawStateDir,
+      "agents",
+      botId,
+      "sessions",
+    );
+
+    // 1. Read sessions.json to find which session IDs are currently "active"
+    //    (mapped to any session key, e.g. channel sessions).
+    const index = await this.readSessionsIndex(sessionsDir);
+    const activeMappedIds = new Set<string>();
+    let currentMainId: string | null = null;
+    const mainKey = `agent:${botId}:main`;
+
+    for (const [key, entry] of Object.entries(index)) {
+      let sessionId: string | null = null;
+      if (typeof entry.sessionFile === "string" && entry.sessionFile.trim()) {
+        // sessionFile is the full path; we want the UUID basename (without .jsonl)
+        sessionId = path.basename(entry.sessionFile, ".jsonl");
+      } else if (
+        typeof entry.sessionId === "string" &&
+        entry.sessionId.trim()
+      ) {
+        sessionId = entry.sessionId;
+      }
+      if (!sessionId) continue;
+      activeMappedIds.add(sessionId);
+      if (key === mainKey) {
+        currentMainId = sessionId;
+      }
+    }
+
+    // 2. List all JSONL files in the sessions directory.
+    let files: string[];
+    try {
+      const dirents = await readdir(sessionsDir, { withFileTypes: true });
+      files = dirents
+        .filter((d) => d.isFile() && d.name.endsWith(".jsonl"))
+        .map((d) => path.join(sessionsDir, d.name));
+    } catch {
+      return { messages: [], sessionCount: 0 };
+    }
+
+    // 3. Candidate sessions = current main session + any JSONL that is NOT
+    //    currently mapped to any session key (orphaned = previous main sessions).
+    const candidateFiles: string[] = [];
+    for (const filePath of files) {
+      const id = path.basename(filePath, ".jsonl");
+      const isMappedToOtherKey =
+        activeMappedIds.has(id) && id !== currentMainId;
+      if (!isMappedToOtherKey) {
+        candidateFiles.push(filePath);
+      }
+    }
+
+    // 4. Read the first-line timestamp of each candidate file to sort sessions
+    //    chronologically (oldest → newest).
+    const withTimestamps: Array<{ filePath: string; ts: number }> = [];
+    for (const filePath of candidateFiles) {
+      const ts = await this.readFirstLineTimestamp(filePath);
+      withTimestamps.push({ filePath, ts });
+    }
+    withTimestamps.sort((a, b) => a.ts - b.ts);
+
+    // 5. Read and concatenate messages from all sessions, then return the last
+    //    `limit` messages so the caller always gets a bounded result.
+    const all: ChatMessage[] = [];
+    for (const { filePath } of withTimestamps) {
+      // Use a large per-file limit; we'll trim the total at the end.
+      const msgs = await this.readMessages(filePath, 10_000, "webchat");
+      all.push(...msgs);
+    }
+
+    return {
+      messages: all.slice(-limit),
+      sessionCount: withTimestamps.length,
+    };
+  }
+
+  /** Read the `timestamp` field from the first line of a JSONL session file. */
+  private async readFirstLineTimestamp(filePath: string): Promise<number> {
+    try {
+      const raw = await readFile(filePath, "utf8");
+      const firstLine = raw.split("\n")[0]?.trim();
+      if (!firstLine) return 0;
+      const parsed = JSON.parse(firstLine) as { timestamp?: string };
+      return parsed.timestamp ? new Date(parsed.timestamp).getTime() : 0;
+    } catch {
+      return 0;
+    }
   }
 
   async appendCompatTranscript(input: {
@@ -709,8 +916,22 @@ export class SessionsRuntime {
         continue;
       }
 
+      // Media blocks (image / file) are user-visible content — if the user
+      // sends just an image with no accompanying text, the text block is
+      // reduced to the empty string by the sanitizer and would otherwise
+      // leave `hasVisibleContent = false`, causing the whole message to be
+      // dropped from the history endpoint.  Treat them as visible so the
+      // bubble (and its attachment card/preview) persists through polling
+      // refreshes.
+      if (blockType === "image" || blockType === "file") {
+        normalizedBlocks.push(block);
+        hasVisibleContent = true;
+        continue;
+      }
+
       // Preserve unknown blocks for forward compatibility, but only text,
-      // replyContext, and tool blocks count as visible transcript content.
+      // replyContext, tool, image and file blocks count as visible transcript
+      // content.
       normalizedBlocks.push(block);
     }
 
@@ -727,6 +948,14 @@ export class SessionsRuntime {
       return normalizedText.length > 0
         ? [{ type: "text", text: normalizedText }]
         : [];
+    }
+
+    // OpenClaw injects synthetic user-role messages to trigger in-context
+    // behaviors (pre-compaction memory flush, system prompts, heartbeats).
+    // These are internal control signals aimed at the model, not real user
+    // input — filtering them out keeps the visible transcript clean.
+    if (SynthesizedUserMessagePatterns.some((re) => re.test(text))) {
+      return [];
     }
 
     const sanitized = this.sanitizeUserMessageText(text, channelType);
@@ -908,6 +1137,47 @@ export class SessionsRuntime {
     return sessions.find((session) => session.id === id) ?? null;
   }
 
+  /**
+   * Look up a session by its OpenClaw sessionKey without pre-creating it.
+   *
+   * Reads sessions.json to find the UUID that OpenClaw assigned to this
+   * sessionKey, then fetches the session from the full sessions list.
+   * Returns null if OpenClaw has not yet created a session for this key.
+   */
+  async getSessionBySessionKey(
+    botId: string,
+    sessionKey: string,
+  ): Promise<SessionResponse | null> {
+    const sessionsDir = path.join(
+      this.env.openclawStateDir,
+      "agents",
+      botId,
+      "sessions",
+    );
+    const index = await this.readSessionsIndex(sessionsDir);
+    const entry = index[sessionKey];
+    if (!entry) {
+      return null;
+    }
+    // Find the UUID file id (sessions.json stores sessionFile or sessionId).
+    // Use path.basename on both fields to strip any path traversal attempts.
+    let sessionFileId: string | null = null;
+    if (typeof entry.sessionFile === "string" && entry.sessionFile.trim()) {
+      sessionFileId = path.basename(entry.sessionFile);
+    } else if (typeof entry.sessionId === "string" && entry.sessionId.trim()) {
+      sessionFileId = `${path.basename(entry.sessionId)}.jsonl`;
+    }
+    if (!sessionFileId) {
+      return null;
+    }
+    const sessions = await this.listSessions();
+    return (
+      sessions.find(
+        (session) => session.id === sessionFileId && session.botId === botId,
+      ) ?? null
+    );
+  }
+
   private async getSessionByKey(
     botId: string,
     sessionKey: string,
@@ -929,6 +1199,62 @@ export class SessionsRuntime {
       "sessions",
       `${sessionKey}.jsonl`,
     );
+  }
+
+  /**
+   * Resolve the actual JSONL file path for a session.
+   *
+   * OpenClaw stores conversation history in UUID-named files
+   * (e.g. `sessions/{uuid}.jsonl`), but its `sessions.json` index maps
+   * sessionKey → `{ sessionId, sessionFile, … }`.  When the sessionKey is a
+   * "named" key (like `agent:{id}:main`), the key-based path will be empty
+   * because OpenClaw never writes to it — it writes to the UUID path instead.
+   *
+   * Algorithm:
+   * 1. Read sessions.json from the agent's sessions directory.
+   * 2. If the index has an entry for this sessionKey with a `sessionFile` or
+   *    `sessionId`, return that path — after verifying it stays within the
+   *    expected state directory (path traversal guard).
+   * 3. Otherwise fall back to the legacy key-based path.
+   */
+  private async resolveSessionFilePath(
+    botId: string,
+    sessionKey: string,
+  ): Promise<string> {
+    const sessionsDir = path.join(
+      this.env.openclawStateDir,
+      "agents",
+      botId,
+      "sessions",
+    );
+    const index = await this.readSessionsIndex(sessionsDir);
+    const entry = index[sessionKey];
+
+    if (entry) {
+      // Prefer the explicit sessionFile field if present
+      if (typeof entry.sessionFile === "string" && entry.sessionFile.trim()) {
+        const resolved = path.resolve(entry.sessionFile);
+        // Guard: resolved path must stay inside openclawStateDir to prevent
+        // path traversal attacks via a malicious sessions.json entry.
+        const stateDir = path.resolve(this.env.openclawStateDir);
+        if (resolved.startsWith(stateDir + path.sep) || resolved === stateDir) {
+          return resolved;
+        }
+        // Suspicious path — fall through to safe alternatives
+        logger.warn(
+          { botId, sessionKey, resolved, stateDir },
+          "resolveSessionFilePath: sessionFile escapes openclawStateDir, ignoring",
+        );
+      }
+      // Fall back to constructing from sessionId — basename only, no traversal
+      if (typeof entry.sessionId === "string" && entry.sessionId.trim()) {
+        const sessionId = path.basename(entry.sessionId); // strip any dirs
+        return path.join(sessionsDir, `${sessionId}.jsonl`);
+      }
+    }
+
+    // Legacy fallback: {sessionKey}.jsonl
+    return this.getSessionFilePath(botId, sessionKey);
   }
 
   private async readSessionsIndex(

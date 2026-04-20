@@ -53,6 +53,10 @@ export class SessionService {
     return this.sessionsRuntime.deleteSession(id);
   }
 
+  async getSessionBySessionKey(botId: string, sessionKey: string) {
+    return this.sessionsRuntime.getSessionBySessionKey(botId, sessionKey);
+  }
+
   async getChatHistory(id: string, limit?: number) {
     return this.sessionsRuntime.getChatHistory(id, limit);
   }
@@ -67,6 +71,10 @@ export class SessionService {
       sessionKey,
       limit,
     );
+  }
+
+  async getFullMainChatHistory(botId: string, limit?: number) {
+    return this.sessionsRuntime.getFullMainChatHistory(botId, limit);
   }
 
   async appendCompatTranscript(input: {

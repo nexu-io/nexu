@@ -111,6 +111,14 @@ if (!hasSingleInstanceLock) {
 // so users see it immediately on first launch.
 void app.dock?.show();
 
+// In dev mode the raw Electron binary is used (no .app bundle), so macOS
+// falls back to the default Electron atom icon.  Set the custom icon explicitly
+// so the Dock shows the correct Nexu icon during local development.
+if (!app.isPackaged && app.dock) {
+  const devIcon = resolve(getDesktopAppRoot(), "build", "icon.png");
+  app.dock.setIcon(devIcon);
+}
+
 const electronRoot = app.isPackaged
   ? process.resourcesPath
   : getDesktopAppRoot();
@@ -1779,6 +1787,19 @@ app.whenReady().then(async () => {
         });
       } else if (useLaunchdMode) {
         await runLaunchdColdStart();
+      } else if (baseRuntimeConfig.runtimeMode === "external") {
+        // External mode: pnpm dev services (controller, web, openclaw) are
+        // already running; just wait for controller to be ready and attach.
+        diagnosticsReporter?.markColdStartRunning(
+          "attaching to external runtime",
+        );
+        logColdStart("attaching to external runtime");
+        logColdStart("waiting for external controller readiness");
+        await waitForControllerReadiness();
+        const sessionId = rotateDesktopLogSession();
+        logColdStart(`cold start session ready sessionId=${sessionId}`);
+        logColdStart("cold start complete");
+        diagnosticsReporter?.markColdStartSucceeded();
       } else {
         await runDesktopColdStart();
       }

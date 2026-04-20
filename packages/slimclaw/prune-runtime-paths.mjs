@@ -65,8 +65,14 @@ export const pruneDependencyTargets = [
   //   packaging. If one of the related optional features is actually exercised at
   //   runtime, that feature may fail to load on macOS arm64, but the package
   //   metadata and JS wrappers remain intact.
-  "node_modules/@img/sharp-darwin-arm64/lib/sharp-darwin-arm64.node",
-  "node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.17.3.dylib",
+  //
+  // NOTE: the sharp + libvips native binaries were previously listed here but
+  // were removed after they broke OpenClaw's `image` tool and the browser
+  // screenshot → vision pipeline used by agent turns that analyse user-sent
+  // images.  Size regression vs fully-pruned baseline is ~6 MB, judged worth
+  // it for correct webchat image handling.  Re-adding them to the prune list
+  // is the correct action only if image/vision is confirmed unused in the
+  // build being packaged.
   "node_modules/@lydell/node-pty-darwin-arm64/prebuilds/darwin-arm64/pty.node",
   "node_modules/@lydell/node-pty-darwin-arm64/prebuilds/darwin-arm64/spawn-helper",
   ...clipboardNativeTargets,

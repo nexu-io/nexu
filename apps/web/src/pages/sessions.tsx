@@ -9,7 +9,6 @@ import {
   ArrowUpRight,
   CheckCircle2,
   FolderOpen,
-  Loader2,
   MessageSquare,
   WifiOff,
 } from "lucide-react";
@@ -630,8 +629,11 @@ export function SessionsPage() {
     enabled: !!id,
   });
 
-  const messages = ((chatData as Record<string, unknown> | undefined)
-    ?.messages ?? []) as ChatMessageData[];
+  // null = not yet loaded, [] = loaded but empty, [...] = loaded with messages
+  const messages = (
+    chatData ? ((chatData as Record<string, unknown>)?.messages ?? []) : null
+  ) as ChatMessageData[] | null;
+  const safeMessages = chatLoading ? [] : (messages ?? []);
 
   // Auto-scroll on new messages
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when messages change
@@ -645,7 +647,7 @@ export function SessionsPage() {
 
   const platform = (session?.channelType ?? "web") as Platform;
   const platformCfg = getPlatformConfig(platform);
-  const messageCount = session?.messageCount || messages.length;
+  const messageCount = session?.messageCount ?? messages?.length ?? 0;
   const lastActive = session?.lastMessageAt ?? session?.updatedAt ?? null;
   const sessionMetadata =
     (session?.metadata as Record<string, unknown> | null | undefined) ?? null;
@@ -793,16 +795,9 @@ export function SessionsPage() {
 
       {/* Message List */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {chatLoading ? (
-          <div className="flex h-full items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
-            <span className="ml-2 text-sm text-text-muted">
-              {t("sessions.chat.loading")}
-            </span>
-          </div>
-        ) : chatError ? (
+        {chatError ? (
           <ChatUnavailable />
-        ) : messages.length === 0 ? (
+        ) : chatLoading ? null : safeMessages.length === 0 ? (
           <ChatEmpty />
         ) : (
           <div data-chat-thread={id} className="px-4 py-8 sm:px-6">
@@ -810,7 +805,7 @@ export function SessionsPage() {
               data-chat-layout="centered"
               className="mx-auto flex w-full max-w-[920px] flex-col gap-5"
             >
-              {messages
+              {safeMessages
                 .map((msg) => ({
                   msg,
                   extracted: extractMessage(

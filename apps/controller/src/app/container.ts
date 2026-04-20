@@ -21,6 +21,7 @@ import { WorkspaceTemplateWriter } from "../runtime/workspace-template-writer.js
 import { AgentService } from "../services/agent-service.js";
 import { AnalyticsService } from "../services/analytics-service.js";
 import { ArtifactService } from "../services/artifact-service.js";
+import { AttachmentStore } from "../services/attachment-store.js";
 import { ChannelFallbackService } from "../services/channel-fallback-service.js";
 import { ChannelService } from "../services/channel-service.js";
 import { DesktopLocalService } from "../services/desktop-local-service.js";
@@ -60,6 +61,7 @@ export interface ControllerContainer {
   desktopLocalService: DesktopLocalService;
   analyticsService: AnalyticsService;
   artifactService: ArtifactService;
+  attachmentStore: AttachmentStore;
   templateService: TemplateService;
   skillhubService: SkillhubService;
   openclawSyncService: OpenClawSyncService;
@@ -159,6 +161,18 @@ export async function createContainer(): Promise<ControllerContainer> {
     openclawSyncService,
   );
   const githubStarVerificationService = new GithubStarVerificationService();
+  const attachmentStore = new AttachmentStore({
+    openclawStateDir: env.openclawStateDir,
+  });
+  // Sweep expired webchat attachments on boot.  Fire-and-forget so controller
+  // startup isn't blocked by disk I/O, and errors are swallowed-with-log by
+  // the store itself.
+  void attachmentStore.cleanupExpired().catch((err) => {
+    logger.warn(
+      { error: err instanceof Error ? err.message : String(err) },
+      "attachment-store: startup cleanup failed",
+    );
+  });
 
   configStore.onCloudStateChanged = async (_change) => {
     // Auto-select a valid default model: on login, pick a managed model;
@@ -209,6 +223,7 @@ export async function createContainer(): Promise<ControllerContainer> {
     ),
     analyticsService,
     artifactService: new ArtifactService(artifactsStore),
+    attachmentStore,
     templateService: new TemplateService(configStore, openclawSyncService),
     skillhubService,
     openclawSyncService,
