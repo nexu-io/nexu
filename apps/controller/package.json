@@ -20,6 +20,7 @@
     "dotenv": "^16.6.1",
     "hono": "^4.7.5",
     "lowdb": "^7.0.1",
+    "pdf-parse": "^2.4.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {

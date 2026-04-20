@@ -1,12 +1,16 @@
+import type { ReactNode } from "react";
+
 export function SurfaceButton({
   active,
   disabled,
+  icon,
   label,
   meta,
   onClick,
 }: {
   active: boolean;
   disabled?: boolean;
+  icon?: ReactNode;
   label: string;
   meta: string;
   onClick: () => void;
@@ -18,6 +22,7 @@ export function SurfaceButton({
       onClick={onClick}
       type="button"
     >
+      {icon && <span className="desktop-nav-icon">{icon}</span>}
       <span>{label}</span>
       <small>{meta}</small>
     </button>

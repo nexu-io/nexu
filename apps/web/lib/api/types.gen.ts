@@ -60,6 +60,43 @@ export type PostApiV1BotsResponses = {
 
 export type PostApiV1BotsResponse = PostApiV1BotsResponses[keyof PostApiV1BotsResponses];
 
+export type GetApiV1BotsDefaultData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/bots/default';
+};
+
+export type GetApiV1BotsDefaultErrors = {
+    /**
+     * Failed to get or create default bot
+     */
+    500: {
+        message: string;
+    };
+};
+
+export type GetApiV1BotsDefaultError = GetApiV1BotsDefaultErrors[keyof GetApiV1BotsDefaultErrors];
+
+export type GetApiV1BotsDefaultResponses = {
+    /**
+     * Default bot (existing or newly created)
+     */
+    200: {
+        id: string;
+        name: string;
+        slug: string;
+        poolId: string;
+        status: 'active' | 'paused' | 'deleted';
+        modelId: string;
+        systemPrompt: string;
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type GetApiV1BotsDefaultResponse = GetApiV1BotsDefaultResponses[keyof GetApiV1BotsDefaultResponses];
+
 export type DeleteApiV1BotsByBotIdData = {
     body?: never;
     path: {
@@ -2223,6 +2260,135 @@ export type GetApiV1ChannelsByChannelIdReadinessResponses = {
 };
 
 export type GetApiV1ChannelsByChannelIdReadinessResponse = GetApiV1ChannelsByChannelIdReadinessResponses[keyof GetApiV1ChannelsByChannelIdReadinessResponses];
+
+export type GetApiV1ChatSessionData = {
+    body?: never;
+    path?: never;
+    query: {
+        botId: string;
+        sessionKey: string;
+    };
+    url: '/api/v1/chat/session';
+};
+
+export type GetApiV1ChatSessionResponses = {
+    /**
+     * Session resolved from sessionKey
+     */
+    200: {
+        session: {
+            id: string;
+            botId: string;
+            sessionKey: string;
+            channelType: string;
+            channelId: string;
+            title: string;
+            status: string;
+            messageCount: number;
+            lastMessageAt: string;
+            metadata: {
+                [key: string]: unknown;
+            };
+            createdAt: string;
+            updatedAt: string;
+        };
+    };
+};
+
+export type GetApiV1ChatSessionResponse = GetApiV1ChatSessionResponses[keyof GetApiV1ChatSessionResponses];
+
+export type PostApiV1ChatLocalData = {
+    body?: {
+        botId: string;
+        sessionKey: string;
+        message: {
+            type: 'text' | 'image' | 'video' | 'audio' | 'file';
+            content: string;
+            metadata?: {
+                width?: number;
+                height?: number;
+                duration?: number;
+                mimeType?: string;
+                filename?: string;
+                size?: number;
+            };
+            attachments?: Array<{
+                type: 'image' | 'file';
+                content: string;
+                metadata?: {
+                    mimeType?: string;
+                    filename?: string;
+                    size?: number;
+                };
+            }>;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/chat/local';
+};
+
+export type PostApiV1ChatLocalResponses = {
+    /**
+     * Local chat message sent
+     */
+    200: {
+        session: {
+            id: string;
+            botId: string;
+            sessionKey: string;
+            channelType: string;
+            channelId: string;
+            title: string;
+            status: string;
+            messageCount: number;
+            lastMessageAt: string;
+            metadata: {
+                [key: string]: unknown;
+            };
+            createdAt: string;
+            updatedAt: string;
+        };
+        message: {
+            id: string;
+            role: string;
+            type: string;
+            content?: unknown;
+            timestamp: number;
+            createdAt: string;
+        };
+    };
+};
+
+export type PostApiV1ChatLocalResponse = PostApiV1ChatLocalResponses[keyof PostApiV1ChatLocalResponses];
+
+export type GetApiV1ChatHistoryData = {
+    body?: never;
+    path?: never;
+    query: {
+        botId: string;
+        limit?: number;
+    };
+    url: '/api/v1/chat/history';
+};
+
+export type GetApiV1ChatHistoryResponses = {
+    /**
+     * Full conversation history aggregated across all compacted sessions
+     */
+    200: {
+        messages: Array<{
+            id: string;
+            role: 'user' | 'assistant';
+            content?: unknown;
+            timestamp: number;
+            createdAt: string;
+        }>;
+        sessionCount: number;
+    };
+};
+
+export type GetApiV1ChatHistoryResponse = GetApiV1ChatHistoryResponses[keyof GetApiV1ChatHistoryResponses];
 
 export type PostApiInternalSessionsData = {
     body?: {

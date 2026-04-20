@@ -33,6 +33,42 @@ export function registerBotRoutes(
   app.openapi(
     createRoute({
       method: "get",
+      path: "/api/v1/bots/default",
+      tags: ["Bots"],
+      responses: {
+        200: {
+          content: { "application/json": { schema: botResponseSchema } },
+          description: "Default bot (existing or newly created)",
+        },
+        500: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Failed to get or create default bot",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        return c.json(
+          await container.agentService.getOrCreateDefaultBot(),
+          200,
+        );
+      } catch (err) {
+        return c.json(
+          {
+            message:
+              err instanceof Error
+                ? err.message
+                : "Failed to get or create bot",
+          },
+          500,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
       path: "/api/v1/bots/{botId}",
       tags: ["Bots"],
       request: { params: botIdParamSchema },

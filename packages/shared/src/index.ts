@@ -24,3 +24,4 @@ export * from "./schemas/credit.js";
 export * from "./lifecycle/index.js";
 export * from "./platform/index.js";
 export { ensure } from "./ensure/index.js";
+export * from "./schemas/device-control.js";
