@@ -136,7 +136,8 @@ function createRewardCopy() {
   ].join("\n");
 }
 
-export function buildDeveloperPrPayload({ author, labels, prUrl }) {
+export function buildDeveloperPrPayload({ title, author, labels, prUrl }) {
+  const safeTitle = sanitizeText(title || "(no title)", 120) || "(no title)";
   const safeAuthor = sanitizeText(author, 80);
   const safeLabels = sanitizeText(labels || "none", 120) || "none";
 
@@ -156,7 +157,7 @@ export function buildDeveloperPrPayload({ author, labels, prUrl }) {
         elements: [
           {
             tag: "markdown",
-            content: `**Author:** ${safeAuthor}\n**Labels:** ${safeLabels}`,
+            content: `**Title:** ${safeTitle}\n**Author:** ${safeAuthor}\n**Labels:** ${safeLabels}`,
           },
           createButtonColumns([createButton("查看贡献 PR", prUrl, "primary")]),
           {
@@ -326,6 +327,7 @@ export async function runFromEnv(env = process.env) {
 
   if (eventKind === "pr") {
     const payload = buildDeveloperPrPayload({
+      title,
       author,
       labels,
       prUrl: safeUrl,

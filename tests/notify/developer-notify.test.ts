@@ -30,12 +30,19 @@ describe("developer-notify", () => {
 
   it("builds the developer PR payload with expected buttons", () => {
     const payload = buildDeveloperPrPayload({
+      title: "fix: resolve login crash",
       author: "alice",
       labels: "bug, help wanted",
       prUrl: "https://github.com/nexu-io/nexu/pull/10",
     });
 
-    expect(payload.card.header.title.content).toContain("又有新贡献者给 Nexu 提 PR");
+    expect(payload.card.header.title.content).toContain(
+      "又有新贡献者给 Nexu 提 PR",
+    );
+    expect(payload.card.body.elements[0]).toMatchObject({
+      tag: "markdown",
+      content: expect.stringContaining("**Title:** fix: resolve login crash"),
+    });
     expect(payload.card.body.elements[0]).toMatchObject({
       tag: "markdown",
       content: expect.stringContaining("**Author:** alice"),
@@ -67,7 +74,9 @@ describe("developer-notify", () => {
     ).toEqual(["Good First Issue", "贡献者指南", "查看全部 Issue"]);
     expect(payload.card.body.elements[2]).toMatchObject({
       tag: "markdown",
-      content: expect.stringContaining("只需 3 步💥：❶ 选任务 ❷ 认领 ❸ 提交 PR"),
+      content: expect.stringContaining(
+        "只需 3 步💥：❶ 选任务 ❷ 认领 ❸ 提交 PR",
+      ),
     });
   });
 
@@ -76,7 +85,9 @@ describe("developer-notify", () => {
       issueUrl: "https://github.com/nexu-io/nexu/issues/99",
     });
 
-    expect(payload.card.header.title.content).toContain("刚新增 1 条 issue 等你来领取");
+    expect(payload.card.header.title.content).toContain(
+      "刚新增 1 条 issue 等你来领取",
+    );
     expect(payload.card.body.elements[1]).toMatchObject({ tag: "column_set" });
     expect(
       payload.card.body.elements[1].columns.map(

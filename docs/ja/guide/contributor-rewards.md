@@ -64,8 +64,11 @@
 
 タスクを選ぶ：[Good First Issue リスト](https://github.com/nexu-io/nexu/labels/good-first-issue)
 
-## nexu Discord コントリビューターグループに参加 💬
+## コミュニティに参加 💬
 
 一人で調べるよりみんなで話す方が早い。グループにはメンテナーや経験豊富なコントリビューターがいます。参加して、最初の貢献について話しましょう 👇
 
 👉 [nexu Discord に参加](https://discord.gg/vMrySTJW8u)
+👉 [nexu Feishu グループに参加](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=bd9j6550-d1ee-41e6-8bbb-7e735ae88ba2)
+
+<img src="/feishu-contributor-qr.png" width="200" alt="nexu Feishu コントリビューターグループ" />

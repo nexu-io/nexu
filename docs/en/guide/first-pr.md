@@ -91,11 +91,14 @@ Fork the repo, create a descriptive branch name, and include in your PR descript
 
 After merge, you'll enter the appreciation and points tracking flow.
 
-## Join the nexu Discord Contributor Group 💬
+## Join the Community 💬
 
 It's better to chat with a group than figure things out alone. The group includes maintainers and experienced contributors — join us and talk about your first contribution 👇
 
 👉 [Join nexu Discord](https://discord.gg/vMrySTJW8u)
+👉 [Join nexu Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=bd9j6550-d1ee-41e6-8bbb-7e735ae88ba2)
+
+<img src="/feishu-contributor-qr.png" width="200" alt="nexu Feishu Contributor Group" />
 
 ## FAQ
 
