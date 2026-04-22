@@ -902,6 +902,52 @@ describe("Launchd Startup Scenarios", () => {
     expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
   }, 15000);
 
+  it("Scenario 19b: missing runtimeIdentityPath in old packaged metadata refuses cross-attach", async () => {
+    const fsMock = await import("node:fs/promises");
+    const runtimePorts = JSON.parse(
+      makeRuntimePorts({
+        appVersion: "1.0.0",
+        openclawStateDir: "/tmp/state",
+        userDataPath: "/tmp/user-data",
+        buildSource: "packaged",
+      }),
+    ) as Record<string, unknown>;
+    const { runtimeIdentityPath: _runtimeIdentityPath, ...legacyPorts } =
+      runtimePorts;
+    const ports = JSON.stringify(legacyPorts);
+    (fsMock.readFile as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockResolvedValueOnce(ports)
+      .mockResolvedValueOnce(ports);
+
+    mockLaunchdManager.getServiceStatus.mockResolvedValue(
+      mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(
+      makeBootstrapEnv({
+        isDev: false,
+        appVersion: "1.0.0",
+        openclawStateDir: "/tmp/state",
+        userDataPath: "/tmp/user-data",
+        buildSource: "packaged",
+        runtimeIdentityPath: "/Applications/Nexu-B.app/Contents/Resources",
+      }) as never,
+    );
+
+    expect(result.isAttach).toBe(false);
+    expect(
+      mockLaunchdManager.bootoutAndWaitForExit.mock.calls.length +
+        mockLaunchdManager.bootoutService.mock.calls.length,
+    ).toBeGreaterThan(0);
+    expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
+  }, 15000);
+
   // -----------------------------------------------------------------------
   // Scenario 20: Partial attach — only controller running
   // -----------------------------------------------------------------------

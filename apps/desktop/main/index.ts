@@ -972,6 +972,7 @@ async function runLaunchdColdStart(): Promise<void> {
     buildSource:
       process.env.NEXU_DESKTOP_BUILD_SOURCE ??
       (app.isPackaged ? "packaged" : "local-dev"),
+    runtimeIdentityPath: app.isPackaged ? process.resourcesPath : undefined,
   });
 
   // Wire launchd-managed units into the orchestrator so the control plane
@@ -1033,6 +1034,7 @@ function focusMainWindow(): void {
     mainWindow.restore();
   }
 
+  app.focus({ steal: true });
   mainWindow.focus();
 }
 
@@ -1874,7 +1876,7 @@ app.whenReady().then(async () => {
       return;
     }
 
-    focusMainWindow();
+    showMainWindowFromResidentEntry();
   });
 
   app.once("before-quit", () => {

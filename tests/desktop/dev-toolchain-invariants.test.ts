@@ -323,6 +323,26 @@ describe("Shutdown safety", () => {
     expect(secondInstanceBlock).toContain("focusMainWindow()");
   });
 
+  it("index.ts restores the main window on activate", () => {
+    const indexTs = readFile("apps/desktop/main/index.ts");
+    const activateStart = indexTs.indexOf('app.on("activate"');
+    const activateBlock = indexTs.slice(activateStart, activateStart + 240);
+
+    expect(activateBlock).toContain(
+      "BrowserWindow.getAllWindows().length === 0",
+    );
+    expect(activateBlock).toContain("showMainWindowFromResidentEntry()");
+  });
+
+  it("focusMainWindow explicitly focuses the macOS app", () => {
+    const indexTs = readFile("apps/desktop/main/index.ts");
+    const focusStart = indexTs.indexOf("function focusMainWindow(): void {");
+    const focusBlock = indexTs.slice(focusStart, focusStart + 260);
+
+    expect(focusBlock).toContain("app.focus({ steal: true })");
+    expect(focusBlock).toContain("mainWindow.focus()");
+  });
+
   // -----------------------------------------------------------------------
   // 19. dev-launchd.sh stop sends SIGTERM before SIGKILL
   // -----------------------------------------------------------------------
