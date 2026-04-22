@@ -453,10 +453,7 @@ export type HostInvokeResultMap = {
   "update:download": { ok: boolean };
   "update:install": undefined;
   "update:get-current-version": { version: string };
-  "update:get-status": {
-    phase: "idle" | "downloading" | "ready";
-    version: string | null;
-  };
+  "update:get-status": DesktopUpdateStatus;
   "update:set-channel": { ok: boolean };
   "update:set-source": { ok: boolean };
   "component:check": {
@@ -746,6 +743,12 @@ export interface UpdateCheckDiagnostic {
   currentVersion: string;
   remoteVersion?: string;
   remoteReleaseDate?: string;
+}
+
+export interface DesktopUpdateStatus {
+  phase: "idle" | "downloading" | "ready";
+  version: string | null;
+  percent: number;
 }
 
 export type UpdaterEventMap = {

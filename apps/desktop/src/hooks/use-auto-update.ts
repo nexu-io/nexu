@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DesktopUpdateCapability } from "../../shared/host";
+import type { DesktopUpdateStatus } from "../../shared/host";
 import type { DesktopUpdateExperience } from "../../shared/update-policy";
 import {
   checkForUpdate,
   downloadUpdate,
   getUpdateCapability,
+  getUpdateStatus,
   installUpdate,
 } from "../lib/host-api";
 import { resolveLocale } from "../lib/i18n";
@@ -137,6 +139,30 @@ export function restorePhaseAfterInstall(
     : state;
 }
 
+export function applyUpdateStatus(
+  state: UpdateState,
+  status: DesktopUpdateStatus,
+): UpdateState {
+  if (state.phase === "installing") {
+    return state;
+  }
+
+  if (
+    (status.phase === "downloading" || status.phase === "ready") &&
+    status.version
+  ) {
+    return {
+      ...state,
+      phase: status.phase,
+      version: status.version,
+      percent: status.percent,
+      dismissed: false,
+    };
+  }
+
+  return state;
+}
+
 export function useAutoUpdate(options?: {
   experience?: DesktopUpdateExperience;
 }) {
@@ -173,6 +199,31 @@ export function useAutoUpdate(options?: {
 
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const pollStatus = () => {
+      void getUpdateStatus()
+        .then((status) => {
+          if (cancelled) {
+            return;
+          }
+          setState((prev) => applyUpdateStatus(prev, status));
+        })
+        .catch(() => {
+          // Ignore transient bridge errors and rely on event-driven updates.
+        });
+    };
+
+    pollStatus();
+    const pollTimer = window.setInterval(pollStatus, 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(pollTimer);
     };
   }, []);
 

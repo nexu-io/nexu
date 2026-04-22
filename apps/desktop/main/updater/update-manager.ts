@@ -227,7 +227,9 @@ export class UpdateManager {
       onChecking: () => {
         const diagnostic = this.getDiagnostic();
         this.logCheck("update check event: checking for update", diagnostic);
-        this.send("update:checking", diagnostic);
+        if (this.userInitiatedCheck) {
+          this.send("update:checking", diagnostic);
+        }
       },
       onAvailable: (info) => {
         const diagnostic = this.getDiagnostic({
@@ -404,8 +406,9 @@ export class UpdateManager {
         "update check: background download already complete, surfacing",
         this.getDiagnostic(),
       );
-      // Brief "checking" flash so the settings button shows a transition
-      this.send("update:checking", this.getDiagnostic());
+      if (this.userInitiatedCheck) {
+        this.send("update:checking", this.getDiagnostic());
+      }
       this.send("update:downloaded", { version: this.pendingVersion });
       return { updateAvailable: true };
     }
@@ -420,8 +423,9 @@ export class UpdateManager {
         this.getDiagnostic(),
       );
 
-      // Brief "checking" flash so the settings button shows a transition
-      this.send("update:checking", this.getDiagnostic());
+      if (this.userInitiatedCheck) {
+        this.send("update:checking", this.getDiagnostic());
+      }
 
       const diagnostic = this.getDiagnostic({
         remoteVersion: this.pendingVersion,
