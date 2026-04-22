@@ -154,6 +154,12 @@ const enSidebar = [
     ],
   },
   {
+    text: "Roadmap",
+    items: [
+      { text: "Product Roadmap", link: "/guide/roadmap" },
+    ],
+  },
+  {
     text: "Community",
     items: [
       { text: "Contributing", link: "/guide/contributing" },
@@ -211,6 +217,12 @@ const jaSidebar = [
       { text: "Windows インストールガイド", link: "/ja/guide/windows-install" },
       { text: "アップデートガイド", link: "/ja/guide/update" },
       { text: "トラブルシューティング", link: "/ja/guide/troubleshooting" },
+    ],
+  },
+  {
+    text: "ロードマップ",
+    items: [
+      { text: "プロダクトロードマップ", link: "/ja/guide/roadmap" },
     ],
   },
   {
@@ -275,6 +287,12 @@ const koSidebar = [
     ],
   },
   {
+    text: "로드맵",
+    items: [
+      { text: "제품 로드맵", link: "/ko/guide/roadmap" },
+    ],
+  },
+  {
     text: "커뮤니티",
     items: [
       { text: "기여하기", link: "/ko/guide/contributing" },
@@ -334,6 +352,12 @@ const zhSidebar = [
       { text: "Windows 正式版安装指南", link: "/zh/guide/windows-install" },
       { text: "更新指南", link: "/zh/guide/update" },
       { text: "修复指南", link: "/zh/guide/troubleshooting" },
+    ],
+  },
+  {
+    text: "路线图",
+    items: [
+      { text: "产品路线图", link: "/zh/guide/roadmap" },
     ],
   },
   {
