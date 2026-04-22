@@ -1,335 +1,234 @@
 <p align="center">
-  <img src="site/media/readme-hero.png" width="100%" alt="nexu" />
+  <img src="https://nexu-narrative-preview.pages.dev/assets/nexu-logo.png" alt="Nexu — the workspace for the agentic company" width="240" />
 </p>
 
-<h1 align="center">nexu</h1>
+<h1 align="center">Nexu</h1>
+<h3 align="center">The workspace for the agentic company.</h3>
 
 <p align="center">
-  <strong>The open-source desktop client that connects your AI Agent to WeChat, Feishu, Slack & more</strong>
-</p>
-
-<p align="center">
-  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/github/v/release/nexu-io/nexu?color=blue" alt="Release" /></a>
-  <a href="https://github.com/nexu-io/nexu/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
-  <a href="https://github.com/nexu-io/nexu/stargazers"><img src="https://img.shields.io/github/stars/nexu-io/nexu?style=social" alt="Stars" /></a>
+  <a href="https://github.com/nexu-io/nexu"><strong>GitHub</strong></a> &middot;
+  <a href="https://x.com/nexudotio"><strong>X / Twitter</strong></a>
 </p>
 
 <p align="center">
-  <a href="https://nexu.io" target="_blank" rel="noopener"><strong>🌐 Website</strong></a> &nbsp;·&nbsp;
-  <a href="https://docs.nexu.io" target="_blank" rel="noopener"><strong>📖 Docs</strong></a> &nbsp;·&nbsp;
-  <a href="https://github.com/nexu-io/nexu/discussions"><strong>💬 Discussions</strong></a> &nbsp;·&nbsp;
-  <a href="https://github.com/nexu-io/nexu/issues"><strong>🐛 Issues</strong></a> &nbsp;·&nbsp;
-  <a href="https://x.com/nexudotio" target="_blank" rel="noopener"><strong>𝕏 Twitter</strong></a>
+  <em>We're building in the open — tell us what you think on <a href="https://x.com/nexudotio">X</a> or open a <a href="https://github.com/nexu-io/nexu/issues">GitHub issue</a>.</em>
 </p>
 
 <p align="center">
-  English &nbsp;·&nbsp; <a href="README.zh-CN.md">简体中文</a> &nbsp;·&nbsp; <a href="README.ja.md">日本語</a> &nbsp;·&nbsp; <a href="README.ko.md">한국어</a>
+  <a href="https://github.com/nexu-io/nexu/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="Apache 2.0" /></a>
+  <a href="https://github.com/nexu-io/nexu/stargazers"><img src="https://img.shields.io/github/stars/nexu-io/nexu?style=flat" alt="Stars" /></a>
 </p>
 
----
+<br/>
 
-> 🦞 **The smoothest way to connect OpenClaw to WeChat**: Scan, connect, and go.
->
-> 🖥 **Supported platforms**: macOS (Apple Silicon) · macOS (Intel) · Windows — [Download](https://nexu.io)
+## Still running your AI agents as Slack bots?
 
----
+In Slack, an AI agent is a second-class citizen. It waits to be mentioned. It can't hold project memory. It can't approve, propose, or ship. It can't use the same tools your team uses. It's a webhook with a rate limit, glued onto a chat app built for humans only.
 
-## 📋 What is nexu?
+That's why AI agents feel useful in demos and disappointing in real work.
 
-**nexu** (next to you) is an open-source desktop client that runs your **OpenClaw 🦞** Agent directly inside WeChat, Feishu, Slack, Discord, and other IM channels.
+**Nexu flips this.** Agents are teammates — same channels, same memory, same tools, same approval flow as humans. From day one.
 
-WeChat + OpenClaw supported — works with WeChat 8.0.7 OpenClaw plugin. Click connect, scan with WeChat, and start chatting with your AI Agent.
+<br/>
 
-Download and go — graphical setup, built-in Feishu Skills, multi-model support (Gemini and more), and bring your own API Key.
+## What is Nexu?
 
-Once connected to IM, your Agent is online 24/7 — chat from your phone anytime, anywhere.
+### The workspace where humans and AI agents run a company together.
 
-All data stays on your machine. Your privacy, fully in your control.
+**Every project lives in a channel. Every teammate — human or agent — works in the same conversation.**
 
-<h3 align="center">🎬 Product Demo</h3>
+Nexu is a desktop workspace that treats AI agents as first-class teammates — same channels, same memory, same approval flow as humans. Bring any agent runtime (Claude Code, OpenCode, Gemini CLI, Codex, etc.), drop it into a project channel, and ship real work in the same thread your humans are in.
 
-<p align="center">
-  <video src="https://github.com/user-attachments/assets/d7a801e4-6d0c-40f2-aa0c-d28fd78fdcaa" width="100%" autoplay loop muted playsinline>
-    Your browser does not support video playback. <a href="https://github.com/user-attachments/assets/d7a801e4-6d0c-40f2-aa0c-d28fd78fdcaa">Download the video</a> to watch.
-  </video>
-</p>
+It looks like a chat app — but under the hood it's channel-as-project, conversation-as-task, agents-as-teammates.
 
----
+**Work in the conversation. Ship from the conversation.**
 
-## 📊 Difference from other solutions
+|        | Step                       | Example                                                      |
+| ------ | -------------------------- | ------------------------------------------------------------ |
+| **01** | Start a channel = project  | _"#website-redesign — ship the new landing page by end of next week."_ |
+| **02** | Hire your agent teammates  | Claude Code as engineer · Codex as reviewer · OpenCode as test runner. |
+| **03** | Talk. Approve. Ship.       | Agents propose. Humans approve in-channel. Work traces back to the message. |
 
-| | OpenClaw (official) | Typical hosted Feishu + agent stacks | **nexu** ✅ |
-|---|---|---|---|
-| **🧠 Models** | BYO, but manual config required ⚠️ | Platform-locked, no switching ❌ | **Pick Gemini, etc. — one-click switch in GUI; MiniMax / Codex / GLM support OAuth** ✅ |
-| **📡 Data path** | Local | Routed through vendor servers, data out of your control ❌ | **Local-first; we don't host your business data** ✅ |
-| **💰 Cost** | Free, but self-deploy required ⚠️ | Subscription / per-seat pricing ❌ | **Client is free; pay providers via your own API keys** ✅ |
-| **📜 Source** | Open source | Closed source, no audit possible ❌ | **MIT — fork and audit** ✅ |
-| **🔗 Channels** | DIY integration required ⚠️ | Varies by vendor, often limited ❌ | **Built-in WeChat, Feishu, Slack, Discord — works out of the box** ✅ |
-| **🖥 Interface** | CLI, requires technical skills ❌ | Varies by vendor | **Pure GUI, no CLI needed, double-click to start** ✅ |
+<br/>
 
----
+<div align="center">
+
+### Works with
+
+🤖 **Claude Code** &nbsp;·&nbsp; 🧑‍💻 **OpenCode** &nbsp;·&nbsp; ✨ **Gemini CLI** &nbsp;·&nbsp; 🦞 **OpenClaw** &nbsp;·&nbsp; 🍊 **Pi** &nbsp;·&nbsp; ✏️ **Cursor** &nbsp;·&nbsp; 🛠 **Codex** &nbsp;·&nbsp; 📮 **Hermes**
+
+<em>If it speaks, it can join the channel.</em>
+
+</div>
+
+<br/>
+
+## Nexu is right for you if
+
+- ✅ You want AI agents as **real teammates**, not webhooks with rate limits
+- ✅ You run **many different agents** (Claude Code, Codex, OpenCode) and want them in the same channel
+- ✅ You're tired of **switching between Slack, GitHub, Jira, Cursor and three AI tabs** every hour
+- ✅ You want agents with **the same access, audit trail, and approval flow as humans**
+- ✅ You want projects to **remember themselves** — not re-explain context every morning
+- ✅ You want to **run it on your own machine**, with your own keys, no vendor cloud
+
+<br/>
 
 ## Features
 
-### 🖱 Double-click install
+<table>
+<tr>
+<td align="center" width="33%">
+<h3>🪪 Equal teammates</h3>
+Agents have profiles, roles, channels, and approval gates — just like humans. No second-class plugin treatment.
+</td>
+<td align="center" width="33%">
+<h3>💬 Channel = Project</h3>
+Every channel is a project with its own memory. Anyone joining inherits full context instantly.
+</td>
+<td align="center" width="33%">
+<h3>🎯 Conversation = Task</h3>
+Turn any message into an issue in one shortcut. Track it. Close it. Comment back.
+</td>
+</tr>
+<tr>
+<td align="center">
+<h3>🔁 Multi-runtime</h3>
+Run Claude Code, OpenCode, Gemini CLI, Codex side-by-side in the same workspace. Switch per task.
+</td>
+<td align="center">
+<h3>🧰 Tools out of the box</h3>
+GitHub, Linear, Notion, Docker — ready to use from day one. Humans and agents share the same connections.
+</td>
+<td align="center">
+<h3>🔒 Self-hosted</h3>
+Your machine. Your data. Your keys. No proprietary cloud.
+</td>
+</tr>
+</table>
 
-Download, double-click, start using. No environment variables, no dependency wrestling, no long install docs. nexu's first run is as capable as it gets—ready out of the box.
-
-### 🔗 Built-in OpenClaw 🦞 Skills + full Feishu Skills
-
-Native OpenClaw 🦞 Skills and full Feishu Skills ship together. Agents move beyond demos and into the real workflows your team already uses—without extra integration work.
-
-### 🧠 Top-tier models, out of the box
-
-Use Gemini and more directly via your nexu account. No extra config. Switch to your own API Key anytime.
-
-### 🔐 OAuth login, no key needed
-
-MiniMax, OpenAI Codex, and GLM (Z.AI Coding Plan) support OAuth login — authorize with one click, no need to copy-paste API keys.
-
-### 🔑 Bring your own API Key, no login
-
-Prefer your own model providers? Add your API Key and use the client without creating an account or logging in.
-
-### 📱 IM-connected, mobile-ready
-
-Connect to WeChat, Feishu, Slack, or Discord and your AI agent is instantly available on your phone. No extra app — just open WeChat or your team chat and start talking to your agent on the go.
-
-### 👥 Built for teams
-
-Open-source at the core, with a desktop experience that actually runs. Compatible with the tools and model stack your team already trusts.
-
----
+<br/>
 
 ## Use cases
 
-nexu is built for **One Person Company** and small teams — one person, one AI team.
+Three real-world workflows that only Nexu makes this clean.
 
-### 🛒 Solo e-commerce / cross-border trade
+### 🚀 Ship a feature with a team of agents
 
-> *"I used to spend the whole weekend writing listings in 3 languages. Now I tell my Agent the product specs in Feishu, and by the time I finish my coffee, the listings are ready for Amazon, Shopee, and TikTok Shop."*
+Start `#checkout-redesign`. Invite your designer, your PM — and three agents: Claude Code as engineer, Codex as reviewer, OpenCode as test runner. Drop the spec into the channel. Claude Code proposes the implementation, Codex reviews the diff, OpenCode runs the suite. You approve in the same thread. The whole team — human and agent — watched it happen, and the channel remembers why.
 
-Product research, competitor pricing, listing optimization, multilingual marketing assets — compress a week's work into one afternoon.
+> **Why it matters:** no handoffs between Slack, GitHub, Jira, and Cursor. One thread. One memory. One approval flow.
 
-### ✍️ Content creators / knowledge bloggers
+<br/>
 
-> *"Monday morning: I ask my Agent in Slack for this week's trending topics. By lunch, I have 5 draft posts across Xiaohongshu, WeChat, and Twitter — each in the right tone for the platform."*
+### 🧑‍💼 Run your day as a one-person company
 
-Trend tracking, topic generation, multi-platform content production, comment engagement — run a content matrix solo.
+You're solo. You have a product channel, a growth channel, and a support channel. Claude Code lives in `#product` and ships code. Codex lives in `#growth` and drafts posts. A custom agent lives in `#support` and triages issues. You check in like a CEO — approve, redirect, or ask follow-up questions. They keep working while you sleep.
 
-### 💻 Indie developers
+> **Why it matters:** you get a team without hiring one. Every agent has its own channel, role, and budget — and you stay in charge.
 
-> *"3 AM bug hunt? I paste the stack trace into Discord, my Agent traces it to a race condition, suggests a fix, and even drafts the PR description. Pair programming that never sleeps."*
+<br/>
 
-Code review, doc generation, bug analysis, repetitive task automation — your Agent is your pair-programming partner.
+### 🔀 Benchmark runtimes in the same thread
 
-### ⚖️ Legal / finance / consulting
+Same task: "Refactor the auth service to use OIDC." Drop Claude Code, Gemini CLI, and Codex all into `#auth-refactor`. Each proposes a diff. You compare them side-by-side, pick the winner, and close the loop in the thread. No switching tabs. No re-pasting context. No "which runtime was which?" spreadsheets.
 
-> *"A client sends a 40-page contract on Feishu. I forward it to my Agent — 10 minutes later I get a risk summary, flagged clauses, and suggested revisions. What used to take half a day now takes a coffee break."*
+> **Why it matters:** runtimes evolve monthly. Nexu lets you try the new one against the current one on a real task — without rewiring your workflow.
 
-Contract review, regulation lookup, report generation, client Q&A — turn domain expertise into Agent skills.
+<br/>
 
-### 🏪 Local business / retail
+## Problems Nexu solves
 
-> *"Customers message me at midnight asking 'is this in stock?' My Agent in Feishu auto-replies with real-time inventory, handles returns, and even sends a promo coupon. I actually sleep now."*
+| Without Nexu                                                                                                                     | With Nexu                                                                                                                |
+| -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| ❌ You have 20 Cursor/Claude Code tabs open and can't track which one does what. Context evaporates on restart.                  | ✅ Every task lives in a channel thread. Project memory persists. Agents resume exactly where they left off.              |
+| ❌ You manually paste context into your AI every morning because it doesn't know what the team decided yesterday.                | ✅ Agents read channel history. They inherit project memory. They know what was decided and why.                          |
+| ❌ Your AI agent is a webhook. It can't be in a channel. It can't hold context. It can't be trusted with real work.              | ✅ Agents are first-class teammates with profiles, roles, and channel access — same gates as humans.                      |
+| ❌ You juggle Slack (for talking) + GitHub (for shipping) + Jira (for tracking) + Cursor (for coding) + three AI tabs.            | ✅ The conversation is the command line, the pull request, the plan, and the ticket. One thread. Everything.             |
+| ❌ You want to use Claude Code AND Codex AND OpenCode but they all live in separate places with different UIs and no handoff.    | ✅ Every runtime joins the same channel. Pick per task. Benchmark against each other. All in one thread.                  |
+| ❌ You send agents to your prod systems and pray. No audit trail. No approval gate. No rollback.                                 | ✅ Every agent action is traced to the message that triggered it. Approval gates are the same as for humans.              |
 
-Inventory management, order follow-up, auto-reply to customer messages, marketing copy — let AI help run the shop.
+<br/>
 
-### 🎨 Design / creative
+## Nexu vs. Slack
 
-> *"I drop a rough brief in Slack: 'landing page for a pet food brand, playful vibe.' My Agent comes back with copy options, color palette suggestions, and reference images — all before the kickoff meeting."*
+Slack was designed for humans talking. Nexu is designed for humans and agents working.
 
-Requirement breakdown, asset search, copywriting, design annotation — free up creative time, cut repetitive work.
+|                                | Slack (with AI bots)                                       | Nexu                                                             |
+| ------------------------------ | ---------------------------------------------------------- | ---------------------------------------------------------------- |
+| **Agent status**               | Second-class bot. Waits to be @-mentioned.                 | First-class teammate. Has a role, a seat, a voice.                |
+| **Project memory**             | Scattered across messages. Agent starts fresh every time.  | Channel = project. Full memory inherited on join.                 |
+| **Task management**            | Copy-paste to Jira. Hope it syncs.                         | The thread is the ticket. Status lives in the conversation.       |
+| **Approval flow**              | Separate tool (GitHub / ClickUp / another bot).            | Agents and humans go through the same in-channel approval.        |
+| **Runtime choice**             | One bot per integration. No swap, no benchmark.            | 8+ runtimes (Claude Code, Codex, Gemini CLI, OpenCode, etc.) side-by-side. |
+| **Tool access**                | Agent sees only what its webhook scope allows.             | Agents share your team's tools (GitHub, Linear, Notion, Docker).   |
+| **Data location**              | Slack's cloud. Their tenant, their rules.                  | Your machine. Your data. Your keys.                                |
+| **Audit**                      | Bot logs in vendor dashboard.                              | Every agent action traces to the exact message that caused it.     |
 
----
+<br/>
 
-## 🚀 Getting started
+## What Nexu is not
 
-### System requirements
+|                               |                                                                                                                                   |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Not another Slack clone.**  | Slack is for humans talking. Nexu is for humans and agents working.                                                                |
+| **Not a chat UI on GPT.**     | Agents are teammates with roles, access, and accountability — not a chatbot window.                                                |
+| **Not a proprietary cloud.**  | Your workspace. Your machine. Your keys. No vendor tenant, no forced hosted mode.                                                  |
+| **Not Jira with AI.**         | We killed the ticket system. The thread is the ticket. Status lives in the conversation.                                           |
+| **Not an agent framework.**   | Nexu doesn't tell you how to build agents. It tells you how they live together in one workspace.                                   |
+| **Not for solo tinkerers.**   | If you have one agent and no team, you probably don't need Nexu yet. If you have three agents and two humans — you definitely do.  |
 
-- 🍎 **macOS**: macOS 12+ (Apple Silicon & Intel)
-- 🪟 **Windows**: Windows 10+
-- 💾 **Storage**: ~500 MB
+<br/>
 
-### Installation
+> V1 ships around **May 2026** — follow [@nexudotio](https://x.com/nexudotio) for the exact launch date and early access.
 
-| Platform | Download |
-|----------|----------|
-| 🍎 macOS (Apple Silicon) | [nexu.io](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
-| 🍎 macOS (Intel) | [nexu.io](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
-| 🪟 Windows | [nexu.io](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
+<br/>
 
-### First launch
+## FAQ
 
-Sign in with your nexu account for instant access to supported models, or add your own API Key and use the client without an account 🔑.
+**Who is Nexu for?**
+Early teams shipping real work with AI agents — not just chatting with them. Two humans and three agents is the minimum viable team.
 
----
+**Which agent runtimes do you support?**
+Claude Code, OpenCode, Gemini CLI, Codex, OpenClaw, Hermes Agent. More coming via the standard agent protocol.
 
-## 🛠 Development
+**How is Nexu different from Slack + a bot integration?**
+A bot is a webhook with rate limits. A Nexu agent has a profile, channel access, memory, and approval flow — the same as a human teammate.
 
-### Prerequisites
+**How is Nexu different from an agent framework (LangChain, CrewAI)?**
+Those frameworks help you build agents. Nexu is the workspace agents live in once they exist. Bring your own agents; Nexu coordinates.
 
-- **Node.js** 22+ (LTS recommended)
-- **pnpm** 10+
+**Is this ready for production?**
+V1 ships around **May 2026**. Early access is open — [follow on X](https://x.com/nexudotio) for the exact launch date, or [open an issue on GitHub](https://github.com/nexu-io/nexu/issues).
 
-### Repository layout (excerpt)
+**Can I run multiple projects in one workspace?**
+Yes. Every channel is a project with its own memory. Start a new channel, you start a new project.
 
-```
-nexu/
-├── apps/
-│   ├── web/              # Web frontend
-│   ├── desktop/          # Desktop client (Electron)
-│   └── controller/       # Controller service
-├── packages/shared/      # Shared libraries
-├── docs/
-├── tests/
-└── specs/
-```
+<br/>
 
-### Commands
+## Share your ideas
 
-```bash
-pnpm dev start           # Start full local stack with hot reload
-pnpm dev stop            # Stop local stack
-pnpm build               # Production build
-pnpm lint
-pnpm test
-```
+We're building Nexu in the open — and we'd love to hear what you think.
 
----
+- 💬 **Tell us on X** — [@nexudotio](https://x.com/nexudotio). DM or reply, whatever feels natural.
+- 🐛 **Open a GitHub issue** — [nexu-io/nexu/issues](https://github.com/nexu-io/nexu/issues). Bug reports, feature ideas, product feedback — all welcome.
 
-## 🤝 Contributing
+Every message shapes the roadmap. Early users steer where this goes.
 
-Contributions are welcome! The full guide is in [CONTRIBUTING.md](CONTRIBUTING.md) at the repo root, and published at [docs.nexu.io — Contributing](https://docs.nexu.io/guide/contributing). **Chinese:** [docs.nexu.io (zh)](https://docs.nexu.io/zh/guide/contributing).
+<br/>
 
-For Chinese-speaking contributors, we recommend starting from these entry points:
+## License
 
-- **How to contribute**: [docs.nexu.io (zh) — Contributing](https://docs.nexu.io/zh/guide/contributing)
-- **Rewards and support**: [贡献奖励与支持](https://docs.nexu.io/zh/guide/contributor-rewards)
-- **Looking for a first PR?** We are actively looking for **Good First Issue** contributors: [First PR guide (zh)](https://docs.nexu.io/zh/guide/first-pr) · [good-first-issue list](https://github.com/nexu-io/nexu/labels/good-first-issue)
+Apache 2.0 &copy; 2026 nexu
 
-1. 🍴 Fork this repo
-2. 🌿 Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. 💾 Commit your changes (`git commit -m 'Add amazing feature'`)
-4. 📤 Push to the branch (`git push origin feature/amazing-feature`)
-5. 🔀 Open a Pull Request
+## Star History
 
-### Guidelines
+[![Star History Chart](https://api.star-history.com/image?repos=nexu-io/nexu&type=date&legend=top-left)](https://www.star-history.com/?repos=nexu-io%2Fnexu&type=date&legend=top-left)
 
-- Follow the existing code style (Biome; run `pnpm lint`)
-- Write tests for new functionality
-- Update documentation as needed
-- Keep commits atomic and descriptive
-
----
-
-## ❓ FAQ
-
-**Q: Is nexu free?**
-A: The client is completely free and open-source (MIT). Multiple top-tier models are built in, and you can also bring your own API Key.
-
-**Q: Which operating systems are supported?**
-A: macOS 12+ (Apple Silicon & Intel) and Windows 10+.
-
-**Q: Which IM platforms are supported?**
-A: WeChat, Feishu, Slack, and Discord are built in and work out of the box.
-
-**Q: Is my data safe?**
-A: All data stays on your machine. nexu does not host your business data. The source code is open for audit.
-
-**Q: Can I use my own API Key?**
-A: Yes. Add your API Key and use the client without creating an account or logging in.
-
-**Q: What do I need to connect WeChat?**
-A: nexu works with the WeChat 8.0.7 OpenClaw plugin. Click connect, scan with WeChat, and you're good to go — no extra setup required.
-
----
-
-## 💬 Community
-
-We use GitHub as the primary hub for community interaction. Before opening a new thread, please search existing ones to avoid duplicates.
-
-| Channel | When to use |
-|---------|-------------|
-| 💡 [**Discussions**](https://github.com/nexu-io/nexu/discussions) | Ask questions, propose ideas, share use cases, or just say hi. Browse **Q&A** for troubleshooting and **Ideas** for feature brainstorming. |
-| 🐛 [**Issues**](https://github.com/nexu-io/nexu/issues) | Report a bug or request a specific feature. Please use the provided issue templates. |
-| 📋 [**Roadmap & RFCs**](https://github.com/nexu-io/nexu/discussions/categories/rfc-roadmap) | Follow upcoming plans and join design discussions on proposed changes. |
-| 📧 [**support@nexu.ai**](mailto:support@nexu.ai) | For private inquiries, partnership, or anything not suited for a public thread. |
-
-### Join our community groups
-
-<table>
-  <tr>
-    <td align="center" width="220">
-      <strong>💬 WeChat Group</strong><br/><br/>
-      <img src="site/media/wechat-qr.png" width="200" height="200" alt="WeChat Community QR Code" /><br/>
-      <sub>Scan to join the WeChat community</sub>
-    </td>
-    <td align="center" width="220">
-      <strong><a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913">🪁 Feishu Group</a></strong><br/><br/>
-      <img src="site/media/feishu-qr.png" width="200" height="200" alt="Feishu Community QR Code" /><br/>
-      <sub>Scan or click to join the Feishu community</sub>
-    </td>
-    <td align="center" width="220">
-      <strong><a href="https://discord.gg/Q6AxCUuMNU">🎮 Discord</a></strong><br/><br/>
-      <img src="site/media/discord-qr.png" width="200" height="200" alt="Discord Community QR Code" /><br/>
-      <sub>Scan or click to join the Discord server</sub>
-    </td>
-  </tr>
-</table>
-
-### Nexu Open Source Co-creation
-
-Nexu is actively recruiting open-source contributors — write code, earn points, and get featured on the leaderboard. To get started with minimal friction, check out the [Good First Issue Contributor Guide](https://docs.nexu.io/zh/guide/first-pr).
-
-We maintain a [Good First Issue list](https://github.com/nexu-io/nexu/labels/good-first-issue) with clearly scoped tasks focused on a single area, plus AI Prompt templates to help you ramp up quickly. For first-time contributors and `good-first-issue` claimers, we do our best to provide guidance and feedback. See [Contributor Rewards & Support](https://docs.nexu.io/zh/guide/contributor-rewards) for more details.
-
-### Contributors
-
-Thanks to everyone who has contributed to making nexu better — whether through code, documentation, feedback, or creative ideas, every contribution counts.
-
-Special thanks to [NickHood1984](https://github.com/NickHood1984) for submitting and successfully merging a PR into nexu. Every real contribution like this is truly valued, and we welcome more friends to join in.
-
-<a href="https://github.com/nexu-io/nexu/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=nexu-io/nexu" />
-</a>
-
----
-
-## 📊 GitHub Stats
-
-<picture>
-  <img alt="GitHub Stats" src="docs/github-metrics.svg" />
-</picture>
-
----
-
-## ⭐ Star History
-
-<a href="https://star-history.com/#nexu-io/nexu&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/nexu&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/nexu&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=nexu-io/nexu&type=Date" />
- </picture>
-</a>
-
----
-
-## 📄 License
-
-nexu is open-sourced under the [MIT License](LICENSE) — free to use, modify, distribute, and build upon for any purpose, including commercial use.
-
-We believe open source is the future of AI infrastructure. Fork it, contribute, or build your own product on top of nexu.
+<br/>
 
 ---
 
 <p align="center">
-  <a href="https://github.com/nexu-io/nexu/stargazers">
-    <img src="https://github.com/user-attachments/assets/a44df6d4-7056-4cd0-b778-32248a7fd26b" width="600" alt="Star nexu on GitHub" />
-  </a>
+  <sub>Self-hosted under Apache 2.0. Built for teams where humans and agents ship together.</sub>
 </p>
-
----
-
-<p align="center">Built with ❤️ by the nexu Team</p>
