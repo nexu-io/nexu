@@ -286,10 +286,8 @@ const zhCN = {
   "home.noRecentActivity": "暂无最近对话",
 
   // ── Rewards ──
-  "rewards.badge": "奖励中心",
   "rewards.title": "分享 nexu，获取额外积分",
   "rewards.desc": "把 nexu 分享给你的社区，完成任务获取额外积分。",
-  "rewards.refresh": "刷新",
   "rewards.progressLabel": "已完成",
   "rewards.earnedLabel": "已获得",
   "rewards.totalCredits": "奖励额度 {{n}}",
