@@ -58,11 +58,9 @@ export function getBudgetBannerStatus(input: {
 export function getBudgetBannerRouteVariant(
   pathname: string,
 ): BudgetBannerRouteVariant {
-  if (pathname === "/workspace" || pathname === "/workspace/home") {
-    return "inline";
-  }
-
   if (
+    pathname === "/workspace" ||
+    pathname === "/workspace/home" ||
     pathname === "/workspace/sessions" ||
     pathname.startsWith("/workspace/sessions/")
   ) {

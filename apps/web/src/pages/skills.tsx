@@ -556,6 +556,12 @@ export function SkillsPage() {
       };
     });
 
+    // Deduplicate installed skills by slug to prevent duplicates when
+    // the same skill is installed for multiple agents
+    const uniqueInstalledBySlug = Array.from(
+      new Map(installed.map((s) => [s.slug, s])).values(),
+    );
+
     if (yoursSubTab === "builtin") {
       const builtinSlugs = new Set(
         installedSkills
@@ -563,11 +569,15 @@ export function SkillsPage() {
           .map((is) => is.slug),
       );
       const filteredDownloading = downloadingWithSource
-        .filter((d) => d.source === "curated" || d.source === "managed")
+        .filter(
+          (d) =>
+            (d.source === "curated" || d.source === "managed") &&
+            !installedSlugs.has(d.skill.slug),
+        )
         .map((d) => d.skill);
       return [
         ...filteredDownloading,
-        ...installed.filter((s) => builtinSlugs.has(s.slug)),
+        ...uniqueInstalledBySlug.filter((s) => builtinSlugs.has(s.slug)),
       ];
     }
     if (yoursSubTab === "custom") {
@@ -584,17 +594,25 @@ export function SkillsPage() {
       const filteredDownloading = downloadingWithSource
         .filter(
           (d) =>
-            d.source === "custom" ||
-            d.source === "workspace" ||
-            d.source === "user",
+            (d.source === "custom" ||
+              d.source === "workspace" ||
+              d.source === "user") &&
+            !installedSlugs.has(d.skill.slug),
         )
         .map((d) => d.skill);
       return [
         ...filteredDownloading,
-        ...installed.filter((s) => customSlugs.has(s.slug)),
+        ...uniqueInstalledBySlug.filter((s) => customSlugs.has(s.slug)),
       ];
     }
-    return [...downloadingWithSource.map((d) => d.skill), ...installed];
+    const uniqueDownloadingSlugs = new Set<string>();
+    const uniqueDownloading = downloadingWithSource.filter((d) => {
+      if (installedSlugs.has(d.skill.slug)) return false;
+      if (uniqueDownloadingSlugs.has(d.skill.slug)) return false;
+      uniqueDownloadingSlugs.add(d.skill.slug);
+      return true;
+    });
+    return [...uniqueDownloading.map((d) => d.skill), ...uniqueInstalledBySlug];
   }, [installedSkills, allSkills, yoursSubTab, activeQueueItems]);
 
   const baseSkills = topTab === "explore" ? exploreSkills : yourSkillsList;
