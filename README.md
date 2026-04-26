@@ -105,6 +105,18 @@ Your machine. Your data. Your keys. No forced vendor cloud.
 
 <br/>
 
+## Architecture
+
+<p align="center">
+  <img src="./docs/assets/architecture-v18.png" alt="Nexu — Managed Agent Engine architecture" width="100%" />
+</p>
+
+<p align="center">
+  <em>A workspace where humans and AI agents are teammates — and one engine manages them all.</em>
+</p>
+
+<br/>
+
 ## How to start
 
 Nexu is built for technical and developer teams first. Getting started is three steps.
