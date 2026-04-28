@@ -31,7 +31,7 @@ export type UpdateState = {
   userInitiated: boolean;
 };
 
-function normalizeUpdateErrorMessage(
+export function normalizeUpdateErrorMessage(
   message: string,
   experience: DesktopUpdateExperience,
 ): string {
@@ -80,6 +80,15 @@ function normalizeUpdateErrorMessage(
     return localized(
       "No network connection is available right now. Reconnect and try the update again.",
       "当前网络不可用。请恢复联网后再次尝试更新。",
+    );
+  }
+
+  if (
+    /fetch failed|failed to fetch|networkerror.*fetch/i.test(trimmedMessage)
+  ) {
+    return localized(
+      "Network connection failed while checking for updates. Check your connection and try again.",
+      "网络连接失败，请检查网络后重试。",
     );
   }
 
