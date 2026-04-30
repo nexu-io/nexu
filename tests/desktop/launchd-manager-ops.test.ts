@@ -255,6 +255,54 @@ describe("LaunchdManager", () => {
       expect(bootstrapCalls).toHaveLength(0);
     });
 
+    it("clears disabled override even when plist is unchanged", async () => {
+      mockExecFile.mockImplementation(
+        (
+          _cmd: string,
+          args: string[],
+          callback: (
+            error: Error | null,
+            result: { stdout: string; stderr: string },
+          ) => void,
+        ) => {
+          if (args.includes("print-disabled")) {
+            callback(null, {
+              stdout: '"io.nexu.controller" => true',
+              stderr: "",
+            });
+            return;
+          }
+          callback(null, { stdout: "", stderr: "" });
+        },
+      );
+
+      const fs = await import("node:fs/promises");
+      (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        "<plist>test</plist>",
+      );
+
+      const { LaunchdManager } = await import(
+        "../../apps/desktop/main/services/launchd-manager"
+      );
+      const mgr = new LaunchdManager({ plistDir: "/tmp/test" });
+
+      await mgr.installService("io.nexu.controller", "<plist>test</plist>");
+
+      const enableCalls = mockExecFile.mock.calls.filter((call: unknown[]) =>
+        (call[1] as string[]).includes("enable"),
+      );
+      const bootstrapCalls = mockExecFile.mock.calls.filter((call: unknown[]) =>
+        (call[1] as string[]).includes("bootstrap"),
+      );
+
+      expect(enableCalls).toHaveLength(1);
+      expect(enableCalls[0]?.[1]).toEqual([
+        "enable",
+        "gui/501/io.nexu.controller",
+      ]);
+      expect(bootstrapCalls).toHaveLength(0);
+    });
+
     it("re-bootstraps if already registered but plist content changed", async () => {
       mockExecFile.mockImplementation(
         (

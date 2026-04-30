@@ -79,6 +79,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -116,6 +118,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Select test plan
+        id: plan
+        run: node scripts/ci/test-plan.mjs
+
       - name: Install tmux
         if: matrix.os == 'macos'
         shell: bash
@@ -135,7 +141,7 @@ jobs:
         run: pnpm build
 
       - name: Run unit tests (includes real launchd integration tests on macOS)
-        run: pnpm test
+        run: ${{ github.event_name == 'pull_request' && steps.plan.outputs.test_command || 'pnpm test:all' }}
 
       - name: Launchd lifecycle e2e test
         shell: bash
