@@ -45,6 +45,7 @@ export function CloudProfilePage() {
   const [draftCloudUrl, setDraftCloudUrl] = useState("");
   const [draftLinkUrl, setDraftLinkUrl] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [disconnectConfirmName, setDisconnectConfirmName] = useState<string | null>(null);
   const [createName, setCreateName] = useState("");
   const [createCloudUrl, setCreateCloudUrl] = useState("");
   const [createLinkUrl, setCreateLinkUrl] = useState("");
@@ -499,7 +500,7 @@ export function CloudProfilePage() {
                   disabled={cloudBusy || profile.polling}
                   onClick={() =>
                     void (profile.connected
-                      ? handleDisconnectProfile(profile.name)
+                      ? setDisconnectConfirmName(profile.name)
                       : handleConnectProfile(profile.name))
                   }
                   type="button"
@@ -673,6 +674,69 @@ export function CloudProfilePage() {
           <span>{statusBannerMessage}</span>
         </p>
       )}
+
+      {disconnectConfirmName ? (
+        <div
+          className="cloud-profile-modal-backdrop"
+          role="presentation"
+        >
+          <dialog
+            className="cloud-profile-modal"
+            open
+            aria-modal="true"
+            aria-labelledby="disconnect-dialog-title"
+          >
+            <div
+              style={{
+                borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                padding: "18px 20px 14px",
+              }}
+            >
+              <div id="disconnect-dialog-title" style={{ fontSize: 14, fontWeight: 600 }}>
+                Confirm disconnect
+              </div>
+              <p
+                style={{
+                  margin: "6px 0 0",
+                  fontSize: 12,
+                  color: "rgba(244, 247, 251, 0.72)",
+                }}
+              >
+                Are you sure you want to disconnect {disconnectConfirmName}? You will not be able to receive or send messages until reconnected.
+              </p>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+                padding: "16px 20px",
+              }}
+            >
+              <button
+                className="cloud-profile-item-action"
+                disabled={cloudBusy}
+                onClick={() => setDisconnectConfirmName(null)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="cloud-profile-import-button is-primary"
+                disabled={cloudBusy}
+                onClick={() => {
+                  const name = disconnectConfirmName;
+                  setDisconnectConfirmName(null);
+                  void handleDisconnectProfile(name);
+                }}
+                type="button"
+              >
+                Confirm
+              </button>
+            </div>
+          </dialog>
+        </div>
+      ) : null}
     </div>
   );
 }
