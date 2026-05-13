@@ -716,6 +716,10 @@ const en = {
   "channels.confirmResetBody":
     "This will remove your current {{platform}} Bot configuration. You will need to complete setup again before nexu can receive messages from this platform.",
   "channels.cancel": "Cancel",
+  "channels.confirmDisconnect": "Confirm disconnect",
+  "channels.confirmDisconnectDesc": "{{platform}} will be disconnected.",
+  "channels.confirmDisconnectBody":
+    "You will not be able to receive or send messages until reconnected.",
   "channels.quotaTitle": "We're experiencing high demand",
   "channels.quotaBody":
     "New bot setup will be available in {{countdown}}. Please try again later.",
