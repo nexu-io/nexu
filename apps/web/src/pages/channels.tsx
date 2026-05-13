@@ -336,6 +336,7 @@ function ConfiguredView({
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [disconnectChannelId, setDisconnectChannelId] = useState<string | null>(null);
 
   const liveEntry = liveStatusData?.channels?.find(
     (e) => e.channelId === channel.id,
@@ -749,12 +750,9 @@ function ConfiguredView({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    track("workspace_channel_disconnect_click", {
-                      channel: platform,
-                    });
-                    disconnectMutation.mutate();
-                  }}
+                  onClick={() =>
+                    setDisconnectChannelId(channel.id)
+                  }
                   disabled={disconnectMutation.isPending}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12px] font-medium text-white rounded-lg bg-red-500 hover:bg-red-600 transition-all disabled:opacity-60"
                 >
@@ -770,6 +768,78 @@ function ConfiguredView({
           </div>
         </div>
       )}
+
+      {disconnectChannelId ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4"
+          onClick={() => setDisconnectChannelId(null)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setDisconnectChannelId(null);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-[420px] rounded-2xl border border-border bg-surface-1 shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10 shrink-0">
+                  <Shield size={14} className="text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-[14px] font-semibold text-text-primary">
+                    {t("channels.confirmDisconnect")}
+                  </h3>
+                  <p className="text-[11px] text-text-secondary mt-0.5">
+                    {t("channels.confirmDisconnectDesc", {
+                      platform: PLATFORM_LABELS[platform],
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[12px] text-text-secondary leading-relaxed">
+                {t("channels.confirmDisconnectBody", {
+                  platform: PLATFORM_LABELS[platform],
+                })}
+              </p>
+              <div className="mt-4 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDisconnectChannelId(null)}
+                  disabled={disconnectMutation.isPending}
+                  className="px-3.5 py-2 text-[12px] font-medium text-text-secondary rounded-lg border border-border hover:border-border-hover hover:bg-surface-3 transition-all disabled:opacity-60"
+                >
+                  {t("channels.cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    track("workspace_channel_disconnect_click", {
+                      channel: platform,
+                    });
+                    disconnectMutation.mutate();
+                    setDisconnectChannelId(null);
+                  }}
+                  disabled={disconnectMutation.isPending}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12px] font-medium text-white rounded-lg bg-red-500 hover:bg-red-600 transition-all disabled:opacity-60"
+                >
+                  {disconnectMutation.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw size={12} />
+                  )}
+                  {t("channels.confirmDisconnect")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

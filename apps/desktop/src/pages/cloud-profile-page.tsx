@@ -45,6 +45,7 @@ export function CloudProfilePage() {
   const [draftCloudUrl, setDraftCloudUrl] = useState("");
   const [draftLinkUrl, setDraftLinkUrl] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [disconnectConfirmName, setDisconnectConfirmName] = useState<string | null>(null);
   const [createName, setCreateName] = useState("");
   const [createCloudUrl, setCreateCloudUrl] = useState("");
   const [createLinkUrl, setCreateLinkUrl] = useState("");
@@ -499,7 +500,7 @@ export function CloudProfilePage() {
                   disabled={cloudBusy || profile.polling}
                   onClick={() =>
                     void (profile.connected
-                      ? handleDisconnectProfile(profile.name)
+                      ? setDisconnectConfirmName(profile.name)
                       : handleConnectProfile(profile.name))
                   }
                   type="button"
@@ -673,6 +674,57 @@ export function CloudProfilePage() {
           <span>{statusBannerMessage}</span>
         </p>
       )}
+
+      {disconnectConfirmName ? (
+        <div className="cloud-profile-modal-backdrop" role="presentation">
+          <dialog
+            className="cloud-profile-modal"
+            open
+            aria-modal="true"
+            aria-labelledby="disconnect-dialog-title"
+          >
+            <div className="cloud-profile-modal-header">
+              <div>
+                <strong id="disconnect-dialog-title">Confirm disconnect</strong>
+                <p>Are you sure you want to disconnect {disconnectConfirmName}?</p>
+              </div>
+              <button
+                className="cloud-profile-modal-close"
+                disabled={cloudBusy}
+                onClick={() => setDisconnectConfirmName(null)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            <p className="cloud-profile-modal-desc">
+              You will not be able to receive or send messages until reconnected.
+            </p>
+            <div className="cloud-profile-modal-actions">
+              <button
+                className="cloud-profile-item-action"
+                disabled={cloudBusy}
+                onClick={() => setDisconnectConfirmName(null)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="cloud-profile-import-button is-primary"
+                disabled={cloudBusy}
+                onClick={() => {
+                  const name = disconnectConfirmName;
+                  setDisconnectConfirmName(null);
+                  void handleDisconnectProfile(name);
+                }}
+                type="button"
+              >
+                Confirm
+              </button>
+            </div>
+          </dialog>
+        </div>
+      ) : null}
     </div>
   );
 }
