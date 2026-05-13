@@ -28,6 +28,18 @@ Once a skill is installed, simply describe what you need in a channel conversati
 
 ![Using a skill in chat](/assets/nexu-skills-chat.webp)
 
+## Example: X/Twitter Workflows with TweetClaw
+
+If the same OpenClaw workspace needs X/Twitter actions, search for "TweetClaw" on the **Skills** page. For CLI-managed OpenClaw workspaces, install the plugin directly:
+
+```bash
+openclaw plugins install @xquik/tweetclaw
+```
+
+[TweetClaw](https://github.com/Xquik-dev/tweetclaw) is also published on [npm](https://www.npmjs.com/package/@xquik/tweetclaw) and listed on [ClawHub](https://clawhub.ai/kriptoburak/xquik-tweetclaw). Use it for tweet search, reply search, follower export, user lookup, media upload and download, direct messages, tweet monitors, webhooks, giveaway draws, and approval-gated posting or replies.
+
+Keep nexu channel credentials separate from TweetClaw and Xquik credentials. Require explicit approval before public or account-changing X/Twitter actions, including posting, replying, direct messaging, following, or unfollowing.
+
 ## FAQ
 
 **Q: Do I need to restart the Agent after installing a skill?**

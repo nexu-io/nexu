@@ -28,6 +28,18 @@
 
 ![技能在对话中的使用效果](/assets/nexu-skills-chat.webp)
 
+## 示例：使用 TweetClaw 处理 X/Twitter 工作流
+
+如果同一个 OpenClaw 工作区还需要 X/Twitter 能力，可在 **Skills** 页面搜索 "TweetClaw"。对于使用 CLI 管理的 OpenClaw 工作区，也可以直接安装插件：
+
+```bash
+openclaw plugins install @xquik/tweetclaw
+```
+
+[TweetClaw](https://github.com/Xquik-dev/tweetclaw) 也发布在 [npm](https://www.npmjs.com/package/@xquik/tweetclaw)，并收录于 [ClawHub](https://clawhub.ai/kriptoburak/xquik-tweetclaw)。可用于推文搜索、回复搜索、粉丝导出、用户查询、媒体上传和下载、私信、推文监控、webhooks、抽奖，以及需要审批的发推或回复。
+
+请将 nexu 渠道凭据与 TweetClaw 和 Xquik 凭据分开管理。涉及公开或改动账号状态的 X/Twitter 操作前，要求明确审批，包括发推、回复、私信、关注或取关。
+
 ## 常见问题
 
 **Q: 安装技能后需要重启 Agent 吗？**

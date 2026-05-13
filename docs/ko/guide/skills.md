@@ -28,6 +28,18 @@ nexu 클라이언트 왼쪽 사이드바에서 **Skills**를 클릭하여 스킬
 
 ![채팅에서 스킬 사용](/assets/nexu-skills-chat.webp)
 
+## 예시: TweetClaw로 X/Twitter 워크플로 처리
+
+같은 OpenClaw 워크스페이스에 X/Twitter 작업도 필요하다면 **Skills** 페이지에서 "TweetClaw"를 검색하세요. CLI로 관리하는 OpenClaw 워크스페이스에서는 플러그인을 직접 설치할 수 있습니다.
+
+```bash
+openclaw plugins install @xquik/tweetclaw
+```
+
+[TweetClaw](https://github.com/Xquik-dev/tweetclaw)는 [npm](https://www.npmjs.com/package/@xquik/tweetclaw)에 게시되어 있으며 [ClawHub](https://clawhub.ai/kriptoburak/xquik-tweetclaw)에도 등록되어 있습니다. 트윗 검색, 답글 검색, 팔로워 내보내기, 사용자 조회, 미디어 업로드 및 다운로드, 다이렉트 메시지, 트윗 모니터링, webhooks, 경품 추첨, 승인 기반 게시 또는 답글에 사용할 수 있습니다.
+
+nexu 채널 자격 증명은 TweetClaw 및 Xquik 자격 증명과 분리해서 관리하세요. 게시, 답글, 다이렉트 메시지, 팔로우, 언팔로우처럼 공개되거나 계정 상태를 바꾸는 X/Twitter 작업 전에는 명시적인 승인을 요구하세요.
+
 ## FAQ
 
 **Q: 스킬 설치 후 Agent를 재시작해야 하나요?**
