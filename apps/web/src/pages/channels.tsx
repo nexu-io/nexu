@@ -721,10 +721,10 @@ function ConfiguredView({
                 </div>
                 <div>
                   <h3 className="text-[14px] font-semibold text-text-primary">
-                    {t("channels.confirmReset")}
+                    {t("channels.confirmDisconnect")}
                   </h3>
                   <p className="text-[11px] text-text-muted mt-0.5">
-                    {t("channels.confirmResetDesc", {
+                    {t("channels.confirmDisconnectDesc", {
                       platform: PLATFORM_LABELS[platform],
                     })}
                   </p>
@@ -734,7 +734,7 @@ function ConfiguredView({
 
             <div className="px-5 py-4">
               <p className="text-[12px] text-text-secondary leading-relaxed">
-                {t("channels.confirmResetBody", {
+                {t("channels.confirmDisconnectBody", {
                   platform: PLATFORM_LABELS[platform],
                 })}
               </p>
@@ -754,6 +754,7 @@ function ConfiguredView({
                       channel: platform,
                     });
                     disconnectMutation.mutate();
+                    setShowResetConfirm(false);
                   }}
                   disabled={disconnectMutation.isPending}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12px] font-medium text-white rounded-lg bg-red-500 hover:bg-red-600 transition-all disabled:opacity-60"
@@ -763,7 +764,7 @@ function ConfiguredView({
                   ) : (
                     <RotateCcw size={12} />
                   )}
-                  {t("channels.confirmReset")}
+                  {t("channels.confirmDisconnect")}
                 </button>
               </div>
             </div>

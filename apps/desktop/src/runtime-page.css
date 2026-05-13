@@ -1589,3 +1589,10 @@ body,
     flex-direction: column;
   }
 }
+
+.cloud-profile-modal-desc {
+  margin: 0 0 20px;
+  font-size: 0.75rem;
+  color: #5e636d;
+  line-height: 1.5;
+}
