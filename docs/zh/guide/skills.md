@@ -34,9 +34,11 @@
 
 ```bash
 openclaw plugins install @xquik/tweetclaw
+openclaw config set plugins.entries.tweetclaw.config.apiKey "$XQUIK_API_KEY"
+openclaw config set tools.alsoAllow '["explore", "tweetclaw"]'
 ```
 
-[TweetClaw](https://github.com/Xquik-dev/tweetclaw) 也发布在 [npm](https://www.npmjs.com/package/@xquik/tweetclaw)，并收录于 [ClawHub](https://clawhub.ai/kriptoburak/xquik-tweetclaw)。可用于推文搜索、回复搜索、粉丝导出、用户查询、媒体上传和下载、私信、推文监控、webhooks、抽奖，以及需要审批的发推或回复。
+[TweetClaw](https://github.com/Xquik-dev/tweetclaw) 也发布在 [npm](https://www.npmjs.com/package/@xquik/tweetclaw)，并收录于 [ClawHub](https://clawhub.ai/plugins/@xquik/tweetclaw)。执行账号相关操作前，请先从 Xquik 控制台获取并设置 `XQUIK_API_KEY`。可用于推文搜索、回复搜索、粉丝导出、用户查询、媒体上传和下载、私信、推文监控、webhooks、抽奖，以及需要审批的发推或回复。
 
 请将 nexu 渠道凭据与 TweetClaw 和 Xquik 凭据分开管理。涉及公开或改动账号状态的 X/Twitter 操作前，要求明确审批，包括发推、回复、私信、关注或取关。
 

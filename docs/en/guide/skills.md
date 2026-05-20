@@ -34,9 +34,11 @@ If the same OpenClaw workspace needs X/Twitter actions, search for "TweetClaw" o
 
 ```bash
 openclaw plugins install @xquik/tweetclaw
+openclaw config set plugins.entries.tweetclaw.config.apiKey "$XQUIK_API_KEY"
+openclaw config set tools.alsoAllow '["explore", "tweetclaw"]'
 ```
 
-[TweetClaw](https://github.com/Xquik-dev/tweetclaw) is also published on [npm](https://www.npmjs.com/package/@xquik/tweetclaw) and listed on [ClawHub](https://clawhub.ai/kriptoburak/xquik-tweetclaw). Use it for tweet search, reply search, follower export, user lookup, media upload and download, direct messages, tweet monitors, webhooks, giveaway draws, and approval-gated posting or replies.
+[TweetClaw](https://github.com/Xquik-dev/tweetclaw) is also published on [npm](https://www.npmjs.com/package/@xquik/tweetclaw) and listed on [ClawHub](https://clawhub.ai/plugins/@xquik/tweetclaw). Set `XQUIK_API_KEY` from the Xquik dashboard before account-backed actions. Use TweetClaw for tweet search, reply search, follower export, user lookup, media upload and download, direct messages, tweet monitors, webhooks, giveaway draws, and approval-gated posting or replies.
 
 Keep nexu channel credentials separate from TweetClaw and Xquik credentials. Require explicit approval before public or account-changing X/Twitter actions, including posting, replying, direct messaging, following, or unfollowing.
 

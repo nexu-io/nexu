@@ -34,9 +34,11 @@ nexu 클라이언트 왼쪽 사이드바에서 **Skills**를 클릭하여 스킬
 
 ```bash
 openclaw plugins install @xquik/tweetclaw
+openclaw config set plugins.entries.tweetclaw.config.apiKey "$XQUIK_API_KEY"
+openclaw config set tools.alsoAllow '["explore", "tweetclaw"]'
 ```
 
-[TweetClaw](https://github.com/Xquik-dev/tweetclaw)는 [npm](https://www.npmjs.com/package/@xquik/tweetclaw)에 게시되어 있으며 [ClawHub](https://clawhub.ai/kriptoburak/xquik-tweetclaw)에도 등록되어 있습니다. 트윗 검색, 답글 검색, 팔로워 내보내기, 사용자 조회, 미디어 업로드 및 다운로드, 다이렉트 메시지, 트윗 모니터링, webhooks, 경품 추첨, 승인 기반 게시 또는 답글에 사용할 수 있습니다.
+[TweetClaw](https://github.com/Xquik-dev/tweetclaw)는 [npm](https://www.npmjs.com/package/@xquik/tweetclaw)에 게시되어 있으며 [ClawHub](https://clawhub.ai/plugins/@xquik/tweetclaw)에도 등록되어 있습니다. 계정 기반 작업 전에 Xquik 대시보드에서 받은 `XQUIK_API_KEY`를 설정하세요. 트윗 검색, 답글 검색, 팔로워 내보내기, 사용자 조회, 미디어 업로드 및 다운로드, 다이렉트 메시지, 트윗 모니터링, webhooks, 경품 추첨, 승인 기반 게시 또는 답글에 사용할 수 있습니다.
 
 nexu 채널 자격 증명은 TweetClaw 및 Xquik 자격 증명과 분리해서 관리하세요. 게시, 답글, 다이렉트 메시지, 팔로우, 언팔로우처럼 공개되거나 계정 상태를 바꾸는 X/Twitter 작업 전에는 명시적인 승인을 요구하세요.
 
