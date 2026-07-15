@@ -5,6 +5,16 @@ import type {
 } from "./provider-types.js";
 
 const bundledProviderModelsById = {
+  minimax: [
+    {
+      id: "MiniMax-M3",
+      name: "MiniMax-M3",
+    },
+    {
+      id: "MiniMax-M2.7",
+      name: "MiniMax-M2.7",
+    },
+  ],
   xiaomi: [
     {
       id: "mimo-v2-flash",

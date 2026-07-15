@@ -1,5 +1,6 @@
 import {
   buildCustomProviderKey,
+  getBundledProviderModelIds,
   getDefaultProviderBaseUrls,
   getProviderAliasCandidates,
   getProviderRuntimePolicy,
@@ -52,6 +53,10 @@ describe("model provider registry", () => {
     expect(getDefaultProviderBaseUrls("minimax")).toContain(
       "https://api.minimaxi.com/anthropic",
     );
+    expect(getBundledProviderModelIds("minimax").slice(0, 2)).toEqual([
+      "MiniMax-M3",
+      "MiniMax-M2.7",
+    ]);
     expect(getDefaultProviderBaseUrls("github-copilot")).toContain(
       "https://api.githubcopilot.com",
     );

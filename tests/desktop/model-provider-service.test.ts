@@ -190,9 +190,14 @@ describe("ModelProviderService", () => {
     };
 
     const status = await service.getMiniMaxOauthStatus();
+    const provider = await store.getProvider("minimax");
 
     expect(status.connected).toBe(true);
     expect(status.inProgress).toBe(false);
+    expect(provider?.models.slice(0, 2)).toEqual([
+      "MiniMax-M3",
+      "MiniMax-M2.7",
+    ]);
   });
 
   it("normalizes minimax poll interval without over-scaling millisecond values", async () => {
