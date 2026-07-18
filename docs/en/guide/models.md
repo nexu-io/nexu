@@ -40,6 +40,7 @@ After a successful connection, use the **Nexu Bot Model** dropdown at the top of
 | --- | --- | --- |
 | Anthropic | `https://api.anthropic.com` | `sk-ant-...` |
 | OpenAI | `https://api.openai.com/v1` | `sk-...` |
+| Atlas Cloud | `https://api.atlascloud.ai/v1` | `atlas-...` |
 | Google AI | `https://generativelanguage.googleapis.com/v1beta` | `AIza...` |
 | xAI | `https://api.x.ai/v1` | `xai-...` |
 | Custom | Your OpenAI-compatible endpoint | Depends on the provider |

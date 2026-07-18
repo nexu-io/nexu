@@ -5,6 +5,16 @@ import type {
 } from "./provider-types.js";
 
 const bundledProviderModelsById = {
+  atlascloud: [
+    {
+      id: "qwen/qwen3.5-flash",
+      name: "Qwen3.5 Flash",
+    },
+    {
+      id: "deepseek-ai/deepseek-v4-pro",
+      name: "DeepSeek V4 Pro",
+    },
+  ],
   xiaomi: [
     {
       id: "mimo-v2-flash",
@@ -54,6 +64,24 @@ const providerRegistryEntries = [
     authModes: ["api-key"],
     apiKind: "openai-completions",
     defaultBaseUrls: ["https://api.openai.com/v1"],
+    supportsCustomBaseUrl: true,
+    supportsModelDiscovery: true,
+    supportsProxyMode: true,
+  },
+  {
+    id: "atlascloud",
+    canonicalOpenClawId: "atlascloud",
+    aliases: ["atlas-cloud"],
+    controllerConfigurable: true,
+    modelsPageVisible: true,
+    displayName: "Atlas Cloud",
+    descriptionKey: "models.provider.openaiCompatible.description",
+    apiDocsUrl: "https://docs.atlascloud.ai",
+    apiKeyPlaceholder: "atlas-...",
+    defaultProxyUrl: "https://api.atlascloud.ai/v1",
+    authModes: ["api-key"],
+    apiKind: "openai-completions",
+    defaultBaseUrls: ["https://api.atlascloud.ai/v1"],
     supportsCustomBaseUrl: true,
     supportsModelDiscovery: true,
     supportsProxyMode: true,
