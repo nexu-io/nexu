@@ -45,6 +45,12 @@ describe("model provider registry", () => {
       displayName: "OpenAI",
       defaultProxyUrl: "https://api.openai.com/v1",
     });
+    expect(normalizeProviderId("atlas-cloud")).toBe("atlascloud");
+    expect(getProviderAliasCandidates("atlascloud")).toContain("atlas-cloud");
+    expect(getProviderUiMetadata("atlascloud")).toMatchObject({
+      displayName: "Atlas Cloud",
+      defaultProxyUrl: "https://api.atlascloud.ai/v1",
+    });
     expect(getProviderUiMetadata("mistral")).toMatchObject({
       displayName: "Mistral AI",
       defaultProxyUrl: "https://api.mistral.ai/v1",
@@ -81,6 +87,7 @@ describe("model provider registry", () => {
       "volcengine",
       "qianfan",
       "xiaomi",
+      "atlascloud",
     ]) {
       expect(entryMap.get(providerId)?.modelsPageVisible).toBe(true);
       expect(entryMap.get(providerId)?.controllerConfigurable).toBe(true);
