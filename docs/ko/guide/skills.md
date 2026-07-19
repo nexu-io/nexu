@@ -42,6 +42,8 @@ openclaw config set tools.alsoAllow '["explore", "tweetclaw"]'
 
 nexu 채널 자격 증명은 TweetClaw 및 Xquik 자격 증명과 분리해서 관리하세요. 게시, 답글, 다이렉트 메시지, 팔로우, 언팔로우처럼 공개되거나 계정 상태를 바꾸는 X/Twitter 작업 전에는 명시적인 승인을 요구하세요.
 
+Xquik은 독립적인 제3자 서비스이며 X Corp.와 제휴하거나 승인을 받지 않았습니다. "Twitter"와 "X"는 X Corp.의 상표입니다.
+
 ## FAQ
 
 **Q: 스킬 설치 후 Agent를 재시작해야 하나요?**

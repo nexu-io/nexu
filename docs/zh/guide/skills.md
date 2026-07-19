@@ -1,6 +1,6 @@
 # 技能安装
 
-技能扩展了 Agent 的能力边界——从网络搜索、文档生成，到飞书多维表格操作、第三方 API 调用，应有尽有。安装一个技能只需几秒钟。
+技能扩展了 Agent 的能力边界，从网络搜索、文档生成，到飞书多维表格操作、第三方 API 调用，应有尽有。安装一个技能只需几秒钟。
 
 ## 第一步：打开技能页面
 
@@ -41,6 +41,8 @@ openclaw config set tools.alsoAllow '["explore", "tweetclaw"]'
 [TweetClaw](https://github.com/Xquik-dev/tweetclaw) 也发布在 [npm](https://www.npmjs.com/package/@xquik/tweetclaw)，并收录于 [ClawHub](https://clawhub.ai/plugins/@xquik/tweetclaw)。执行账号相关操作前，请先从 Xquik 控制台获取并设置 `XQUIK_API_KEY`。可用于推文搜索、回复搜索、粉丝导出、用户查询、媒体上传和下载、私信、推文监控、webhooks、抽奖，以及需要审批的发推或回复。
 
 请将 nexu 渠道凭据与 TweetClaw 和 Xquik 凭据分开管理。涉及公开或改动账号状态的 X/Twitter 操作前，要求明确审批，包括发推、回复、私信、关注或取关。
+
+Xquik 是独立的第三方服务，与 X Corp. 无关联，也未获得其认可。"Twitter" 和 "X" 是 X Corp. 的商标。
 
 ## 常见问题
 

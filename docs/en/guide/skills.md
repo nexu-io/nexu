@@ -42,6 +42,8 @@ openclaw config set tools.alsoAllow '["explore", "tweetclaw"]'
 
 Keep nexu channel credentials separate from TweetClaw and Xquik credentials. Require explicit approval before public or account-changing X/Twitter actions, including posting, replying, direct messaging, following, or unfollowing.
 
+Xquik is an independent third-party service. Not affiliated with X Corp. "Twitter" and "X" are trademarks of X Corp.
+
 ## FAQ
 
 **Q: Do I need to restart the Agent after installing a skill?**

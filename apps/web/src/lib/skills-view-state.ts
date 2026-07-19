@@ -112,9 +112,13 @@ export function applySkillsViewStatePatch(
   current: URLSearchParams,
   patch: Partial<SkillsViewState>,
 ): URLSearchParams {
+  const currentState = parseSkillsViewState(current);
+  const isTopTabSwitch =
+    patch.topTab !== undefined && patch.topTab !== currentState.topTab;
   const nextState = {
-    ...parseSkillsViewState(current),
+    ...currentState,
     ...patch,
+    ...(isTopTabSwitch ? { searchQuery: "" } : {}),
   };
 
   return createSkillsSearchParams(nextState);

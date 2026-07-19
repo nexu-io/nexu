@@ -42,6 +42,8 @@ openclaw config set tools.alsoAllow '["explore", "tweetclaw"]'
 
 nexu のチャンネル認証情報は、TweetClaw と Xquik の認証情報とは分けて管理してください。投稿、返信、ダイレクトメッセージ、フォロー、フォロー解除など、公開またはアカウント状態を変更する X/Twitter 操作には明示的な承認を求めてください。
 
+Xquik は独立したサードパーティサービスであり、X Corp. とは提携しておらず、承認も受けていません。「Twitter」と「X」は X Corp. の商標です。
+
 ## FAQ
 
 **Q: スキルをインストールしたあと、エージェントの再起動は必要ですか？**
