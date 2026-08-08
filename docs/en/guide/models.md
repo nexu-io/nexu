@@ -48,13 +48,10 @@ MiniMax model discovery includes `MiniMax-M3` and `MiniMax-M2.7`. The provider r
 
 MiniMax BYOK prices are in USD per one million tokens:
 
-| Model and service tier | Input token range | Input | Output | Cache read | Cache write |
-| --- | --- | ---: | ---: | ---: | ---: |
-| `MiniMax-M3`, standard | Up to 512,000 | $0.30 | $1.20 | $0.06 | N/A |
-| `MiniMax-M3`, standard | Above 512,000 | $0.60 | $2.40 | $0.12 | N/A |
-| `MiniMax-M3`, priority | Up to 512,000 | $0.45 | $1.80 | $0.09 | N/A |
-| `MiniMax-M3`, priority | Above 512,000 | $0.90 | $3.60 | $0.18 | N/A |
-| `MiniMax-M2.7` | All requests | $0.30 | $1.20 | $0.06 | $0.375 |
+| Model | Input | Output | Cache read | Cache write |
+| --- | ---: | ---: | ---: | ---: |
+| `MiniMax-M3` | $0.60 | $2.40 | $0.12 | N/A |
+| `MiniMax-M2.7` | $0.30 | $1.20 | $0.06 | $0.375 |
 
 ## Step 3: Select the Active Model
 

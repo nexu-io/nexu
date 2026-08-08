@@ -50,8 +50,11 @@ describe("model provider registry", () => {
       displayName: "Mistral AI",
       defaultProxyUrl: "https://api.mistral.ai/v1",
     });
-    expect(getDefaultProviderBaseUrls("minimax")).toContain(
-      "https://api.minimaxi.com/anthropic",
+    expect(getDefaultProviderBaseUrls("minimax")).toEqual(
+      expect.arrayContaining([
+        "https://api.minimax.io/anthropic",
+        "https://api.minimaxi.com/anthropic",
+      ]),
     );
     expect(getBundledProviderModelIds("minimax").slice(0, 2)).toEqual([
       "MiniMax-M3",
