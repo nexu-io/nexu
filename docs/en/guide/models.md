@@ -28,6 +28,31 @@ Select **Anthropic**, **OpenAI**, **Google AI**, or another provider from the li
 
 ![BYOK model configuration](/assets/nexu-models-byok.webp)
 
+### MiniMax
+
+The built-in MiniMax provider uses the Anthropic-compatible API. Choose the global or China region preset in the MiniMax settings to use the matching Anthropic-compatible base URL. To use the OpenAI-compatible API instead, add a **Custom OpenAI-compatible** provider and enter the matching OpenAI-compatible base URL.
+
+| Region | Anthropic-compatible base URL | OpenAI-compatible base URL |
+| --- | --- | --- |
+| Global | `https://api.minimax.io/anthropic` | `https://api.minimax.io/v1` |
+| China | `https://api.minimaxi.com/anthropic` | `https://api.minimaxi.com/v1` |
+
+Keep the Anthropic-compatible base URL ending in `/anthropic`. Nexu passes this base URL directly to the runtime, which appends `/v1/messages`.
+
+MiniMax model discovery includes `MiniMax-M3` and `MiniMax-M2.7`. The provider reports the following model metadata; input availability in Nexu depends on the selected product surface.
+
+| Model | Context window | Input modalities | Thinking modes |
+| --- | ---: | --- | --- |
+| `MiniMax-M3` | 1,000,000 tokens | Text, image, video | Adaptive, disabled |
+| `MiniMax-M2.7` | 204,800 tokens | Text | Always on |
+
+MiniMax BYOK prices are in USD per one million tokens:
+
+| Model | Input | Output | Cache read | Cache write |
+| --- | ---: | ---: | ---: | ---: |
+| `MiniMax-M3` | $0.60 | $2.40 | $0.12 | N/A |
+| `MiniMax-M2.7` | $0.30 | $1.20 | $0.06 | $0.375 |
+
 ## Step 3: Select the Active Model
 
 After a successful connection, use the **Nexu Bot Model** dropdown at the top of the Settings page to choose the model your Agent should use.

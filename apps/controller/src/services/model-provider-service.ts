@@ -75,8 +75,9 @@ const MINI_MAX_PLUGIN_ID = "minimax-portal-auth";
 const MINI_MAX_OAUTH_SCOPE = "group_id profile model.completion";
 const MINI_MAX_OAUTH_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:user_code";
 const MINI_MAX_CLIENT_ID = "78257093-7e40-4613-99e0-527b14b39113";
+const MINI_MAX_TARGET_MODELS = getBundledProviderModelIds("minimax");
 const MINI_MAX_API_MODELS = [
-  "MiniMax-M2.7",
+  ...MINI_MAX_TARGET_MODELS,
   "MiniMax-M2.7-highspeed",
   "MiniMax-M2.5",
   "MiniMax-M2.5-highspeed",
@@ -85,7 +86,7 @@ const MINI_MAX_API_MODELS = [
   "MiniMax-M2",
 ];
 const MINI_MAX_OAUTH_MODELS = [
-  "MiniMax-M2.7",
+  ...MINI_MAX_TARGET_MODELS,
   "MiniMax-M2.7-highspeed",
   "MiniMax-M2.5",
   "MiniMax-M2.5-highspeed",
