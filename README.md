@@ -30,7 +30,7 @@
 
 > 🦞 **The smoothest way to connect OpenClaw to WeChat**: Scan, connect, and go.
 >
-> 🖥 **Supported platforms**: macOS (Apple Silicon) · macOS (Intel) · Windows — [Download](https://nexu.io)
+> 🖥 **Supported platforms**: macOS (Apple Silicon) · macOS (Intel) · Windows · Linux (AppImage) — [Download](https://nexu.io)
 
 ---
 
@@ -149,6 +149,7 @@ Requirement breakdown, asset search, copywriting, design annotation — free up 
 
 - 🍎 **macOS**: macOS 12+ (Apple Silicon & Intel)
 - 🪟 **Windows**: Windows 10+
+- 🐧 **Linux**: x64 (AppImage)
 - 💾 **Storage**: ~500 MB
 
 ### Installation
@@ -158,6 +159,7 @@ Requirement breakdown, asset search, copywriting, design annotation — free up 
 | 🍎 macOS (Apple Silicon) | [nexu.io](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
 | 🍎 macOS (Intel) | [nexu.io](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
 | 🪟 Windows | [nexu.io](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
+| 🐧 Linux (AppImage x64) | [Releases](https://github.com/nexu-io/nexu/releases) |
 
 ### First launch
 
@@ -229,7 +231,7 @@ For Chinese-speaking contributors, we recommend starting from these entry points
 A: The client is completely free and open-source (MIT). Multiple top-tier models are built in, and you can also bring your own API Key.
 
 **Q: Which operating systems are supported?**
-A: macOS 12+ (Apple Silicon & Intel) and Windows 10+.
+A: macOS 12+ (Apple Silicon & Intel), Windows 10+, and Linux (x64 AppImage).
 
 **Q: Which IM platforms are supported?**
 A: WeChat, Feishu, Slack, and Discord are built in and work out of the box.

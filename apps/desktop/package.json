@@ -23,6 +23,7 @@
     "dist:win": "node ./scripts/dist-win.mjs",
     "dist:win:local": "node ./scripts/dist-win-stage.mjs --local",
     "dist:win:unsigned": "node ./scripts/dist-win-stage.mjs --target=dir",
+    "dist:linux": "node ./scripts/dist-linux.mjs",
     "dist:mac:unsigned:arm64": "NEXU_DESKTOP_TARGET_ARCH=arm64 node ./scripts/dist-mac.mjs --unsigned",
     "dist:mac:unsigned:x64": "NEXU_DESKTOP_TARGET_ARCH=x64 node ./scripts/dist-mac.mjs --unsigned",
     "upload:sourcemaps": "node ./scripts/upload-sourcemaps.mjs",
@@ -161,6 +162,17 @@
         }
       ],
       "artifactName": "nexu-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "icon": "build/icons/linux/icons",
+      "category": "Development",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "nexu-${version}-linux-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
