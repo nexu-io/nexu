@@ -28,6 +28,22 @@ Nexu クライアントの左サイドバーで **Skills** をクリックし、
 
 ![Skill in action during conversation](/assets/nexu-skills-chat.webp)
 
+## 例：TweetClaw で X/Twitter ワークフローを扱う
+
+同じ OpenClaw ワークスペースで X/Twitter の操作も必要な場合は、**Skills** ページで「TweetClaw」を検索します。CLI で管理している OpenClaw ワークスペースでは、プラグインを直接インストールできます。
+
+```bash
+openclaw plugins install clawhub:@xquik/tweetclaw
+openclaw config set plugins.entries.tweetclaw.config.apiKey "$XQUIK_API_KEY"
+openclaw config set tools.alsoAllow '["explore", "tweetclaw"]'
+```
+
+[TweetClaw](https://github.com/Xquik-dev/tweetclaw) は [npm](https://www.npmjs.com/package/@xquik/tweetclaw) でも公開され、[ClawHub](https://clawhub.ai/plugins/@xquik/tweetclaw) にも掲載されています。アカウント連携アクションの前に、Xquik ダッシュボードで取得した `XQUIK_API_KEY` を設定してください。ツイート検索、返信検索、フォロワーエクスポート、ユーザー検索、メディアアップロードとダウンロード、ダイレクトメッセージ、ツイート監視、webhooks、抽選、承認付きの投稿や返信に使えます。
+
+nexu のチャンネル認証情報は、TweetClaw と Xquik の認証情報とは分けて管理してください。投稿、返信、ダイレクトメッセージ、フォロー、フォロー解除など、公開またはアカウント状態を変更する X/Twitter 操作には明示的な承認を求めてください。
+
+Xquik は独立したサードパーティサービスであり、X Corp. とは提携しておらず、承認も受けていません。「Twitter」と「X」は X Corp. の商標です。
+
 ## FAQ
 
 **Q: スキルをインストールしたあと、エージェントの再起動は必要ですか？**

@@ -42,6 +42,19 @@ describe("skills-view-state", () => {
     expect(next.toString()).toBe("tab=explore&tag=automation&q=tavily");
   });
 
+  it("clears search when switching top-level tabs", () => {
+    const next = applySkillsViewStatePatch(
+      new URLSearchParams("tab=explore&tag=automation&q=tavily"),
+      {
+        topTab: "yours",
+        yoursSubTab: "all",
+        activeTag: null,
+      },
+    );
+
+    expect(next.toString()).toBe("");
+  });
+
   it("preserves the current query string on detail links", () => {
     expect(
       createSkillDetailPath(
