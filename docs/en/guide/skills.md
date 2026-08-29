@@ -33,7 +33,7 @@ Once a skill is installed, simply describe what you need in a channel conversati
 If the same OpenClaw workspace needs X/Twitter actions, search for "TweetClaw" on the **Skills** page. For CLI-managed OpenClaw workspaces, install the plugin directly:
 
 ```bash
-openclaw plugins install @xquik/tweetclaw
+openclaw plugins install clawhub:@xquik/tweetclaw
 openclaw config set plugins.entries.tweetclaw.config.apiKey "$XQUIK_API_KEY"
 openclaw config set tools.alsoAllow '["explore", "tweetclaw"]'
 ```

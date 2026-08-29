@@ -33,7 +33,7 @@
 如果同一个 OpenClaw 工作区还需要 X/Twitter 能力，可在 **Skills** 页面搜索 "TweetClaw"。对于使用 CLI 管理的 OpenClaw 工作区，也可以直接安装插件：
 
 ```bash
-openclaw plugins install @xquik/tweetclaw
+openclaw plugins install clawhub:@xquik/tweetclaw
 openclaw config set plugins.entries.tweetclaw.config.apiKey "$XQUIK_API_KEY"
 openclaw config set tools.alsoAllow '["explore", "tweetclaw"]'
 ```

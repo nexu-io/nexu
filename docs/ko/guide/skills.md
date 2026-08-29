@@ -33,7 +33,7 @@ nexu 클라이언트 왼쪽 사이드바에서 **Skills**를 클릭하여 스킬
 같은 OpenClaw 워크스페이스에 X/Twitter 작업도 필요하다면 **Skills** 페이지에서 "TweetClaw"를 검색하세요. CLI로 관리하는 OpenClaw 워크스페이스에서는 플러그인을 직접 설치할 수 있습니다.
 
 ```bash
-openclaw plugins install @xquik/tweetclaw
+openclaw plugins install clawhub:@xquik/tweetclaw
 openclaw config set plugins.entries.tweetclaw.config.apiKey "$XQUIK_API_KEY"
 openclaw config set tools.alsoAllow '["explore", "tweetclaw"]'
 ```
