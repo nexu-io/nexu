@@ -528,9 +528,9 @@ jobs:
           fi
 
   trigger-e2e:
-    needs: [release, package-windows]
+    needs: [release, package-windows, package-linux]
     runs-on: ubuntu-latest
-    if: always() && needs.release.result == 'success' && needs.package-windows.result == 'success'
+    if: always() && needs.release.result == 'success' && needs.package-windows.result == 'success' && needs.package-linux.result == 'success'
     steps:
       - name: Resolve channel
         id: channel
@@ -738,3 +738,176 @@ jobs:
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Windows Release Downloads"
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Installer: $baseUrl/${{ steps.artifacts.outputs.latest_installer }}"
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Manifest: $baseUrl/${{ steps.artifacts.outputs.manifest_file }}"
+
+
+  package-linux:
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+    outputs:
+      channel: ${{ steps.meta.outputs.channel }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          desktop_version=$(node -e "const fs=require('node:fs'); const pkg=JSON.parse(fs.readFileSync('apps/desktop/package.json','utf8')); process.stdout.write(pkg.version);")
+          expected_tag="v${desktop_version}"
+          legacy_expected_tag="desktop-v${desktop_version}"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag_name="${{ inputs.tag_name }}"
+          else
+            tag_name="${GITHUB_REF#refs/tags/}"
+          fi
+
+          if [ "$tag_name" != "$expected_tag" ] && [ "$tag_name" != "$legacy_expected_tag" ]; then
+            echo "Expected desktop release tag $expected_tag (legacy: $legacy_expected_tag) but received $tag_name" >&2
+            exit 1
+          fi
+
+          prerelease="false"
+          if [[ "$desktop_version" == *-* ]]; then
+            prerelease="true"
+          fi
+
+          channel="stable"
+          if [ "$prerelease" = "true" ]; then
+            channel="beta"
+          fi
+
+          commit_sha=$(git rev-parse HEAD)
+
+          {
+            echo "desktop_version=$desktop_version"
+            echo "tag_name=$tag_name"
+            echo "prerelease=$prerelease"
+            echo "channel=$channel"
+            echo "commit_sha=$commit_sha"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build Linux AppImage
+        env:
+          NEXU_CLOUD_URL: https://nexu.io
+          NEXU_LINK_URL: https://link.nexu.io
+          NEXU_DESKTOP_UPDATE_CHANNEL: ${{ steps.meta.outputs.channel }}
+          NEXU_DESKTOP_BUILD_SOURCE: release
+          NEXU_DESKTOP_BUILD_BRANCH: ${{ github.ref_name }}
+          NEXU_DESKTOP_BUILD_COMMIT: ${{ steps.meta.outputs.commit_sha }}
+          VITE_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          export NEXU_DESKTOP_BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          pnpm --filter @nexu/desktop dist:linux
+
+      - name: Prepare Linux release artifacts
+        id: artifacts
+        shell: bash
+        env:
+          VERSION: ${{ steps.meta.outputs.desktop_version }}
+          CHANNEL: ${{ steps.meta.outputs.channel }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          release_dir="apps/desktop/release"
+          channel_artifacts="apps/desktop/release-artifacts-linux"
+
+          mkdir -p "$channel_artifacts"
+          rm -f "$channel_artifacts"/*
+
+          appimage_files=("${release_dir}"/*.AppImage)
+          if [ "${#appimage_files[@]}" -eq 0 ]; then
+            echo "No Linux AppImage was produced" >&2
+            exit 1
+          fi
+
+          source_appimage="${appimage_files[0]}"
+          versioned_appimage="nexu-${VERSION}-linux-x64.AppImage"
+
+          latest_appimage="nexu-latest-linux-x64.AppImage"
+          if [ "$CHANNEL" != "stable" ]; then
+            latest_appimage="nexu-latest-${CHANNEL}-linux-x64.AppImage"
+          fi
+
+          checksum_file="desktop-linux-x64-sha256.txt"
+
+          cp "$source_appimage" "${channel_artifacts}/${versioned_appimage}"
+          cp "$source_appimage" "${channel_artifacts}/${latest_appimage}"
+
+          shasum -a 256 "${channel_artifacts}/${versioned_appimage}" > "${channel_artifacts}/${checksum_file}"
+
+          {
+            echo "versioned_appimage=$versioned_appimage"
+            echo "latest_appimage=$latest_appimage"
+            echo "checksum_file=$checksum_file"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload Linux workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-release-${{ steps.meta.outputs.tag_name }}-linux-x64
+          path: |
+            apps/desktop/release-artifacts-linux/${{ steps.artifacts.outputs.versioned_appimage }}
+            apps/desktop/release-artifacts-linux/${{ steps.artifacts.outputs.latest_appimage }}
+            apps/desktop/release-artifacts-linux/${{ steps.artifacts.outputs.checksum_file }}
+          if-no-files-found: error
+
+      - name: Upload Linux assets to existing GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.meta.outputs.tag_name }}
+        run: |
+          gh release upload $TAG_NAME \
+            "apps/desktop/release-artifacts-linux/${{ steps.artifacts.outputs.versioned_appimage }}" \
+            "apps/desktop/release-artifacts-linux/${{ steps.artifacts.outputs.latest_appimage }}" \
+            "apps/desktop/release-artifacts-linux/${{ steps.artifacts.outputs.checksum_file }}" \
+            --clobber
+
+      - name: Upload Linux artifacts to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          AWS_REGION: auto
+          CHANNEL: ${{ steps.meta.outputs.channel }}
+        run: |
+          set -euo pipefail
+          prefix="${CHANNEL}/linux/x64"
+
+          aws s3 cp "apps/desktop/release-artifacts-linux/${{ steps.artifacts.outputs.versioned_appimage }}" "s3://nexu-desktop-releases/${prefix}/${{ steps.artifacts.outputs.versioned_appimage }}" --no-progress
+          aws s3 cp "apps/desktop/release-artifacts-linux/${{ steps.artifacts.outputs.latest_appimage }}" "s3://nexu-desktop-releases/${prefix}/${{ steps.artifacts.outputs.latest_appimage }}" --no-progress
+          aws s3 cp "apps/desktop/release-artifacts-linux/${{ steps.artifacts.outputs.checksum_file }}" "s3://nexu-desktop-releases/${prefix}/${{ steps.artifacts.outputs.checksum_file }}" --no-progress
+
+      - name: Publish Linux download links
+        run: |
+          base_url="https://desktop-releases.nexu.io/${{ steps.meta.outputs.channel }}/linux/x64"
+          {
+            echo "## Linux Release Downloads"
+            echo "- AppImage: ${base_url}/${{ steps.artifacts.outputs.latest_appimage }}"
+          } >> "$GITHUB_STEP_SUMMARY"

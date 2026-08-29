@@ -15,7 +15,7 @@ export function readBuildTargetPlatformEnv(env = process.env) {
   }
 
   throw new Error(
-    `Unsupported ${NEXU_TARGET_PLATFORM_ENV} value: ${value}. Expected "mac" or "win".`,
+    `Unsupported ${NEXU_TARGET_PLATFORM_ENV} value: ${value}. Expected "mac", "win", or "linux".`,
   );
 }
 

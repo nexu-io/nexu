@@ -1,7 +1,7 @@
 export const NEXU_TARGET_PLATFORM_ENV = "NEXU_TARGET_PLATFORM";
 
 export function isDesktopRuntimePlatform(platformId) {
-  return platformId === "mac" || platformId === "win";
+  return platformId === "mac" || platformId === "win" || platformId === "linux";
 }
 
 export function resolveDesktopRuntimePlatform(platform) {
@@ -10,9 +10,11 @@ export function resolveDesktopRuntimePlatform(platform) {
       return "mac";
     case "win32":
       return "win";
+    case "linux":
+      return "linux";
     default:
       throw new Error(
-        `Unsupported desktop platform: ${platform}. Only macOS and Windows adapters are implemented.`,
+        `Unsupported desktop platform: ${platform}. Only macOS, Windows, and Linux adapters are implemented.`,
       );
   }
 }
